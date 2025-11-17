@@ -291,7 +291,7 @@ async fn main() -> Result<(), std::io::Error> {
         .at("/monday/:slug", get(scraper_trap))
         .at("/robots.txt", get(robots_txt));
 
-    Server::new(TcpListener::bind("0.0.0.0:3000"))
+    Server::new(TcpListener::bind("0.0.0.0:43796"))
         .run(app)
         .await
 }
