@@ -95,7 +95,7 @@ static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
             }
         }
 
-        // Extract paragraphs and split into sentences
+        // Extract paragraphs and split into sentences, collecting interesting short sentences as titles
         let mut current_para = String::new();
         for line in book_content.lines() {
             let trimmed = line.trim();
@@ -121,6 +121,32 @@ static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
             sentences.extend(para_sentences);
         }
     }
+
+    // Extract interesting short sentences to use as titles
+    for sentence in &sentences {
+        // Good title candidates: 30-80 chars, starts with capital, has 3-10 words
+        let word_count = sentence.split_whitespace().count();
+        if sentence.len() >= 30
+            && sentence.len() <= 80
+            && word_count >= 3
+            && word_count <= 10
+            && sentence.chars().next().map_or(false, |c| c.is_uppercase())
+        {
+            // Clean up trailing weird punctuation combinations
+            let cleaned = sentence
+                .trim_end_matches(&['.', '"', '\'', '-', '!', '?', ',', ';', ':', '”'][..])
+                .trim_end();
+            
+            // Only add if it still has reasonable length and ends properly
+            if cleaned.len() >= 25 && cleaned.split_whitespace().count() >= 3 {
+                titles.push(cleaned.to_string());
+            }
+        }
+    }
+
+    // Deduplicate titles while preserving order
+    let mut seen = std::collections::HashSet::new();
+    titles.retain(|title| seen.insert(title.clone()));
 
     // Calculate memory usage
     let titles_size: usize = titles.iter().map(|s| s.len()).sum();
