@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
 use poem::{
     Route, Server,
+    endpoint::StaticFilesEndpoint,
     error::InternalServerError,
     get, handler,
     listener::TcpListener,
@@ -287,11 +288,16 @@ async fn robots_txt() -> &'static str {
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
     let app = Route::new()
+        .nest("/static/", StaticFilesEndpoint::new("./static/"))
         .at("/", get(index))
         .at("/monday/:slug", get(scraper_trap))
         .at("/robots.txt", get(robots_txt));
 
-    Server::new(TcpListener::bind("0.0.0.0:43796"))
+    const PORT: u16 = 43796;
+
+    println!("Starting server on http://localhost:{}", PORT);
+
+    Server::new(TcpListener::bind(&format!("0.0.0.0:{}", PORT)))
         .run(app)
         .await
 }

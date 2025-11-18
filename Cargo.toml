@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-poem = { version = "3.1.12", features = ["server", "compression"] }
+poem = { version = "3.1.12", features = ["server", "compression", "static-files", "embed"] }
 tokio = { version = "1.17.0", features = ["rt-multi-thread", "macros"] }
 serde = { version = "1.0.140", features = ["derive"] }
 tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
