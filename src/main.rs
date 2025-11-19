@@ -248,6 +248,19 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
         .titles
         .choose_multiple(&mut rng, num_links)
         .map(|link_title| {
+            // Generate random Unix timestamp from 0 (1970-01-01) to now
+            let random_timestamp = rng.gen_range(0..std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs());
+            
+            // Convert to date (days since epoch)
+            let days = random_timestamp / 86400;
+            let year = 1970 + (days / 365);
+            let day_of_year = days % 365;
+            let month = (day_of_year / 30).min(11) + 1;
+            let day = (day_of_year % 30) + 1;
+            
             // Create URL-friendly slug: lowercase, spaces to hyphens, URL encoded
             let slug = link_title
                 .to_lowercase()
@@ -256,7 +269,7 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
                 .replace('.', "");
             let url_slug = urlencoding::encode(&slug);
 
-            (link_title.clone(), format!("/blog/{}", url_slug))
+            (link_title.clone(), format!("/blog/{:04}/{:02}/{:02}/{}", year, month, day, url_slug))
         })
         .collect()
 }
@@ -272,6 +285,19 @@ fn generate_haiku_links(num_links: usize) -> Vec<(String, String)> {
         .lines_5
         .choose_multiple(&mut rng, available_lines)
         .map(|link_text| {
+            // Generate random Unix timestamp from 0 (1970-01-01) to now
+            let random_timestamp = rng.gen_range(0..std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs());
+            
+            // Convert to date (days since epoch)
+            let days = random_timestamp / 86400;
+            let year = 1970 + (days / 365);
+            let day_of_year = days % 365;
+            let month = (day_of_year / 30).min(11) + 1;
+            let day = (day_of_year % 30) + 1;
+            
             // Create URL-friendly slug from the haiku line
             let slug = link_text
                 .to_lowercase()
@@ -283,7 +309,7 @@ fn generate_haiku_links(num_links: usize) -> Vec<(String, String)> {
                 .collect::<String>();
             let url_slug = urlencoding::encode(&slug);
 
-            (link_text.clone(), format!("/haiku/{}", url_slug))
+            (link_text.clone(), format!("/haiku/{:04}/{:02}/{:02}/{}", year, month, day, url_slug))
         })
         .collect()
 }
@@ -429,8 +455,8 @@ async fn main() -> Result<(), std::io::Error> {
     let app = Route::new()
         .nest("/static/", StaticFilesEndpoint::new("./static/"))
         .at("/", get(index))
-        .at("/haiku/:slug", get(haiku_page))
-        .at("/blog/:slug", get(scraper_trap))
+        .at("/haiku/*slug", get(haiku_page))
+        .at("/blog/*slug", get(scraper_trap))
         .at("/robots.txt", get(robots_txt));
 
     const PORT: u16 = 43796;
