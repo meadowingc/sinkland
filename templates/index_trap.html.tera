@@ -14,7 +14,7 @@
     </div>
     
     {% for paragraph in paragraphs %}
-    <p>{{ paragraph }}</p>
+    <p>{{ paragraph | safe }}</p>
     {% endfor %}
 
     

@@ -6,7 +6,7 @@
     <h1>{{ title }}</h1>
     
     {% for paragraph in paragraphs %}
-    <p>{{ paragraph }}</p>
+    <p>{{ paragraph | safe }}</p>
     {% endfor %}
     
     <div class="links">

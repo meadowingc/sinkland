@@ -239,6 +239,111 @@ fn generate_random_paragraphs(
         .collect()
 }
 
+// Helper function to add random inline links to paragraphs
+fn add_inline_links_to_paragraphs(paragraphs: Vec<String>) -> Vec<String> {
+    let mut rng = rand::thread_rng();
+    
+    paragraphs.into_iter().map(|paragraph| {
+        // Decide how many words to link in this paragraph (0, 1, 2, or rarely 3)
+        // Weight towards fewer links: 40% chance of 0, 30% of 1, 25% of 2, 5% of 3
+        let num_links = match rng.gen_range(0..100) {
+            0..40 => 0,
+            40..70 => 1,
+            70..95 => 2,
+            _ => 3,
+        };
+        
+        if num_links == 0 {
+            return paragraph;
+        }
+        
+        // Split paragraph into words while preserving punctuation
+        let words: Vec<&str> = paragraph.split_whitespace().collect();
+        
+        // Need at least 10 words to add links
+        if words.len() < 10 {
+            return paragraph;
+        }
+        
+        // Select random word positions to link (avoid first and last few words)
+        let linkable_start = 2;
+        let linkable_end = words.len().saturating_sub(2);
+        
+        if linkable_end <= linkable_start {
+            return paragraph;
+        }
+        
+        let mut link_positions: Vec<usize> = (linkable_start..linkable_end)
+            .collect();
+        link_positions.shuffle(&mut rng);
+        
+        // Take only the number of positions we want to link, ensuring they're spaced out
+        let mut selected_positions = Vec::new();
+        for pos in link_positions {
+            if selected_positions.is_empty() || 
+               selected_positions.iter().all(|&p: &usize| (p as i32 - pos as i32).abs() > 5) {
+                selected_positions.push(pos);
+                if selected_positions.len() >= num_links {
+                    break;
+                }
+            }
+        }
+        
+        selected_positions.sort();
+        
+        // Generate the links
+        let links = generate_random_links(selected_positions.len());
+        
+        // Build the new paragraph with inline links
+        let mut result = String::new();
+        let mut link_index = 0;
+        
+        for (i, word) in words.iter().enumerate() {
+            if !result.is_empty() {
+                result.push(' ');
+            }
+            
+            if let Some(&pos) = selected_positions.get(link_index) {
+                if i == pos && link_index < links.len() {
+                    // Extract the word without trailing punctuation
+                    let (clean_word, punctuation) = extract_word_and_punctuation(word);
+                    
+                    // Create the link
+                    result.push_str(&format!(
+                        r#"<a href="{}" rel="nofollow noopener noreferrer">{}</a>{}"#,
+                        links[link_index].1,
+                        clean_word,
+                        punctuation
+                    ));
+                    link_index += 1;
+                } else {
+                    result.push_str(word);
+                }
+            } else {
+                result.push_str(word);
+            }
+        }
+        
+        result
+    }).collect()
+}
+
+// Helper function to extract word and trailing punctuation
+fn extract_word_and_punctuation(word: &str) -> (String, String) {
+    let mut chars: Vec<char> = word.chars().collect();
+    let mut punctuation = String::new();
+    
+    // Extract trailing punctuation
+    while !chars.is_empty() && !chars.last().unwrap().is_alphanumeric() {
+        if let Some(ch) = chars.pop() {
+            punctuation.insert(0, ch);
+        }
+    }
+    
+    let clean_word: String = chars.into_iter().collect();
+    (clean_word, punctuation)
+}
+
 // Helper function to generate random links with unique titles
 fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
     let mut rng = rand::thread_rng();
@@ -367,6 +472,9 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
     // Pick 4-5 random paragraphs, each made of 3-6 random sentences
     let num_paragraphs = rng.gen_range(4..=5);
     let paragraphs = generate_random_paragraphs(num_paragraphs, (3, 6));
+    
+    // Add random inline links to paragraphs
+    let paragraphs = add_inline_links_to_paragraphs(paragraphs);
 
     // Generate 2-7 random links
     let num_links = rng.gen_range(2..=7);
@@ -391,6 +499,9 @@ fn index() -> Result<Html<String>, poem::Error> {
     // Pick 1-2 random paragraphs for preview
     let num_paragraphs = rng.gen_range(1..=2);
     let paragraphs = generate_random_paragraphs(num_paragraphs, (2, 4));
+    
+    // Add random inline links to paragraphs
+    let paragraphs = add_inline_links_to_paragraphs(paragraphs);
 
     // Generate 5-10 random links to trap pages
     let num_links = rng.gen_range(5..=10);
