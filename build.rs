@@ -1,3 +1,4 @@
+use parquet::file::reader::{FileReader, SerializedFileReader};
 use std::fs;
 use std::path::Path;
 
@@ -62,6 +63,17 @@ fn main() {
         match download_rss_feed("https://meadow.cafe/feed", &rss_file) {
             Ok(count) => println!("cargo:warning=Downloaded {} blog posts", count),
             Err(e) => println!("cargo:warning=Failed to download RSS feed: {}", e),
+        }
+    }
+
+    // Download haiku dataset
+    let haiku_file = "assets/haikus.json";
+    if !Path::new(&haiku_file).exists() {
+        println!("cargo:warning=Downloading haiku dataset...");
+
+        match download_haikus(&haiku_file) {
+            Ok(count) => println!("cargo:warning=Downloaded {} haiku lines", count),
+            Err(e) => println!("cargo:warning=Failed to download haikus: {}", e),
         }
     }
 
@@ -163,4 +175,74 @@ fn decode_html_entities(text: &str) -> String {
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&nbsp;", " ")
+}
+
+fn download_haikus(output_file: &str) -> Result<usize, Box<dyn std::error::Error>> {
+    // Download the full parquet file
+    let parquet_url =
+        "https://huggingface.co/datasets/statworx/haiku/resolve/main/train.parquet?download=true";
+    let parquet_path = "assets/haiku_temp.parquet";
+
+    println!("cargo:warning=Downloading full haiku parquet file...");
+    let response = reqwest::blocking::get(parquet_url)?;
+    let bytes = response.bytes()?;
+    fs::write(parquet_path, bytes)?;
+
+    println!("cargo:warning=Parsing parquet file...");
+
+    let file = fs::File::open(parquet_path)?;
+    let reader = SerializedFileReader::new(file)?;
+
+    let mut lines_5 = Vec::new();
+    let mut lines_7 = Vec::new();
+
+    // Read all rows
+    let mut iter = reader.get_row_iter(None)?;
+
+    while let Some(row_result) = iter.next() {
+        let row = row_result?;
+
+        // Get the "text" field - it's at index 1 in the schema
+        // The row is a list of (column_name, field_value) tuples
+        let fields = row.get_column_iter().collect::<Vec<_>>();
+
+        if fields.len() > 1 {
+            if let parquet::record::Field::Str(text_field) = &fields[1].1 {
+                // Split haiku into lines (format: "line1 / line2 / line3")
+                let lines: Vec<&str> = text_field.split('/').map(|s| s.trim()).collect();
+
+                if lines.len() == 3 {
+                    // Traditional haiku: 5-7-5 syllables
+                    if !lines[0].is_empty() {
+                        lines_5.push(lines[0].to_string());
+                    }
+                    if !lines[1].is_empty() {
+                        lines_7.push(lines[1].to_string());
+                    }
+                    if !lines[2].is_empty() {
+                        lines_5.push(lines[2].to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // Clean up temp file
+    let _ = fs::remove_file(parquet_path);
+
+    println!(
+        "cargo:warning=Parsed {} 5-syllable lines and {} 7-syllable lines",
+        lines_5.len(),
+        lines_7.len()
+    );
+
+    // Save as JSON for easy loading later
+    let haiku_data = serde_json::json!({
+        "lines_5": lines_5,
+        "lines_7": lines_7,
+    });
+
+    fs::write(output_file, serde_json::to_string_pretty(&haiku_data)?)?;
+
+    Ok(lines_5.len() + lines_7.len())
 }

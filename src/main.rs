@@ -9,6 +9,7 @@ use poem::{
 };
 use rand::Rng;
 use rand::seq::SliceRandom;
+use serde::Deserialize;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tera::{Context, Tera};
 
@@ -26,6 +27,30 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
 
 // Atomic counter for trap visits
 static TRAP_VISITS: AtomicUsize = AtomicUsize::new(0);
+static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(0);
+
+// Haiku data structure
+#[derive(Deserialize)]
+struct HaikuData {
+    lines_5: Vec<String>,
+    lines_7: Vec<String>,
+}
+
+static HAIKU_DATA: Lazy<HaikuData> = Lazy::new(|| {
+    let haiku_file = "assets/haikus.json";
+    let content = std::fs::read_to_string(haiku_file).expect("Failed to read haikus.json");
+    let mut data: HaikuData = serde_json::from_str(&content).expect("Failed to parse haikus.json");
+
+    // Deduplicate lines
+    use std::collections::HashSet;
+    let mut seen_5 = HashSet::new();
+    let mut seen_7 = HashSet::new();
+
+    data.lines_5.retain(|line| seen_5.insert(line.clone()));
+    data.lines_7.retain(|line| seen_7.insert(line.clone()));
+
+    data
+});
 
 // Book data structure
 struct BookData {
@@ -136,7 +161,7 @@ static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
             let cleaned = sentence
                 .trim_end_matches(&['.', '"', '\'', '-', '!', '?', ',', ';', ':', '”'][..])
                 .trim_end();
-            
+
             // Only add if it still has reasonable length and ends properly
             if cleaned.len() >= 25 && cleaned.split_whitespace().count() >= 3 {
                 titles.push(cleaned.to_string());
@@ -147,20 +172,6 @@ static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
     // Deduplicate titles while preserving order
     let mut seen = std::collections::HashSet::new();
     titles.retain(|title| seen.insert(title.clone()));
-
-    // Calculate memory usage
-    let titles_size: usize = titles.iter().map(|s| s.len()).sum();
-    let sentences_size: usize = sentences.iter().map(|s| s.len()).sum();
-    let total_size = titles_size + sentences_size;
-    let total_mb = total_size as f64 / 1024.0 / 1024.0;
-
-    println!(
-        "Loaded {} titles and {} sentences from {} books",
-        titles.len(),
-        sentences.len(),
-        book_files.len()
-    );
-    println!("Memory usage: {:.2} MB ({} bytes)", total_mb, total_size);
 
     BookData { titles, sentences }
 });
@@ -245,9 +256,72 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
                 .replace('.', "");
             let url_slug = urlencoding::encode(&slug);
 
-            (link_title.clone(), format!("/monday/{}", url_slug))
+            (link_title.clone(), format!("/blog/{}", url_slug))
         })
         .collect()
+}
+
+// Helper function to generate haiku-based links
+fn generate_haiku_links(num_links: usize) -> Vec<(String, String)> {
+    let mut rng = rand::thread_rng();
+
+    // Use 5-syllable haiku lines as link text (they're shorter and work better as links)
+    let available_lines = HAIKU_DATA.lines_5.len().min(num_links);
+
+    HAIKU_DATA
+        .lines_5
+        .choose_multiple(&mut rng, available_lines)
+        .map(|link_text| {
+            // Create URL-friendly slug from the haiku line
+            let slug = link_text
+                .to_lowercase()
+                .trim()
+                .replace(' ', "-")
+                .replace(['.', ',', '!', '?', ':', ';', '\"', '\''], "")
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '-')
+                .collect::<String>();
+            let url_slug = urlencoding::encode(&slug);
+
+            (link_text.clone(), format!("/haiku/{}", url_slug))
+        })
+        .collect()
+}
+
+// Helper function to generate a random haiku
+fn generate_random_haiku() -> String {
+    let mut rng = rand::thread_rng();
+
+    // Pick two different 5-syllable lines
+    let line1 = HAIKU_DATA
+        .lines_5
+        .choose(&mut rng)
+        .map(|s| s.as_str())
+        .unwrap_or("A silent moment");
+
+    let mut line3 = HAIKU_DATA
+        .lines_5
+        .choose(&mut rng)
+        .map(|s| s.as_str())
+        .unwrap_or("Fades into the mist");
+
+    // Ensure line3 is different from line1
+    while line3 == line1 && HAIKU_DATA.lines_5.len() > 1 {
+        line3 = HAIKU_DATA
+            .lines_5
+            .choose(&mut rng)
+            .map(|s| s.as_str())
+            .unwrap_or("Fades into the mist");
+    }
+
+    // Pick one 7-syllable line
+    let line2 = HAIKU_DATA
+        .lines_7
+        .choose(&mut rng)
+        .map(|s| s.as_str())
+        .unwrap_or("Between the pages of time");
+
+    format!("{}\n{}\n{}", line1, line2, line3)
 }
 
 #[handler]
@@ -296,9 +370,14 @@ fn index() -> Result<Html<String>, poem::Error> {
     let num_links = rng.gen_range(5..=10);
     let links = generate_random_links(num_links);
 
+    // Generate 3-5 haiku links
+    let num_haiku_links = rng.gen_range(3..=5);
+    let haiku_links = generate_haiku_links(num_haiku_links);
+
     let mut context = Context::new();
     context.insert("paragraphs", &paragraphs);
     context.insert("links", &links);
+    context.insert("haiku_links", &haiku_links);
 
     TEMPLATES
         .render("index_trap.html.tera", &context)
@@ -311,17 +390,78 @@ async fn robots_txt() -> &'static str {
     "User-agent: *\nDisallow: /\n"
 }
 
+#[handler]
+fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
+    // Increment the haiku visit counter
+    let visit_count = HAIKU_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
+
+    let mut rng = rand::thread_rng();
+
+    // Generate a random haiku
+    let haiku = generate_random_haiku();
+
+    // Pick a random title from haiku lines
+    let title = HAIKU_DATA
+        .lines_5
+        .choose(&mut rng)
+        .map(|s| s.as_str())
+        .unwrap_or("Daily Haiku")
+        .to_string();
+
+    // Generate 3-7 random haiku links
+    let num_links = rng.gen_range(3..=7);
+    let links = generate_haiku_links(num_links);
+
+    let mut context = Context::new();
+    context.insert("title", &title);
+    context.insert("haiku", &haiku);
+    context.insert("links", &links);
+    context.insert("visit_count", &visit_count);
+
+    TEMPLATES
+        .render("haiku_trap.html.tera", &context)
+        .map_err(InternalServerError)
+        .map(Html)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
     let app = Route::new()
         .nest("/static/", StaticFilesEndpoint::new("./static/"))
         .at("/", get(index))
-        .at("/monday/:slug", get(scraper_trap))
+        .at("/haiku/:slug", get(haiku_page))
+        .at("/blog/:slug", get(scraper_trap))
         .at("/robots.txt", get(robots_txt));
 
     const PORT: u16 = 43796;
 
     println!("Starting server on http://localhost:{}", PORT);
+    println!(
+        "Loaded {} titles and {} sentences from 6 books",
+        BOOK_DATA.titles.len(),
+        BOOK_DATA.sentences.len()
+    );
+    println!(
+        "Loaded {} 5-syllable lines and {} 7-syllable lines ({} total haiku lines)",
+        HAIKU_DATA.lines_5.len(),
+        HAIKU_DATA.lines_7.len(),
+        HAIKU_DATA.lines_5.len() + HAIKU_DATA.lines_7.len()
+    );
+
+    let memory_usage = std::mem::size_of_val(&*BOOK_DATA.titles)
+        + BOOK_DATA.titles.iter().map(|s| s.len()).sum::<usize>()
+        + std::mem::size_of_val(&*BOOK_DATA.sentences)
+        + BOOK_DATA.sentences.iter().map(|s| s.len()).sum::<usize>()
+        + std::mem::size_of_val(&*HAIKU_DATA.lines_5)
+        + HAIKU_DATA.lines_5.iter().map(|s| s.len()).sum::<usize>()
+        + std::mem::size_of_val(&*HAIKU_DATA.lines_7)
+        + HAIKU_DATA.lines_7.iter().map(|s| s.len()).sum::<usize>();
+
+    println!(
+        "Memory usage: {:.2} MB ({} bytes)",
+        memory_usage as f64 / 1024.0 / 1024.0,
+        memory_usage
+    );
 
     Server::new(TcpListener::bind(&format!("0.0.0.0:{}", PORT)))
         .run(app)

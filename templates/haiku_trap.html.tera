@@ -1,0 +1,43 @@
+{% extends "base.html.tera" %}
+
+{% block title %}{{ title }}{% endblock title %}
+
+{% block extra_styles %}
+    .haiku-box {
+        background: #f8f9fa;
+        padding: 40px;
+        margin: 40px 0;
+        border-left: 4px solid #3498db;
+        border-radius: 4px;
+    }
+    
+    .haiku {
+        font-size: 1.3em;
+        line-height: 2;
+        color: #2c3e50;
+        white-space: pre-line;
+        font-style: italic;
+        text-align: center;
+    }
+{% endblock extra_styles %}
+
+{% block content %}
+    <h1>{{ title }}</h1>
+    
+    <div class="haiku-box">
+        <div class="haiku">{{ haiku }}</div>
+    </div>
+    
+    <div class="links">
+        <h2>More Reflections</h2>
+        <ul>
+            {% for link in links %}
+            <li><a href="{{ link.1 }}" rel="nofollow noopener noreferrer" style="font-style: italic;">{{ link.0 }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+    
+    <div class="footer">
+        Contemplations shared: {{ visit_count }}
+    </div>
+{% endblock content %}

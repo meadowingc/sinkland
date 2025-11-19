@@ -1,64 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
-    <meta name="referrer" content="no-referrer">
-    <title>Classic Literature Archive</title>
-    <style>
-        body {
-            font-family: Georgia, serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
-            color: #333;
-        }
-        h1 {
-            color: #2c3e50;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
-        }
-        .intro {
-            margin: 30px 0;
-            font-style: italic;
-            color: #555;
-        }
-        p {
-            margin-bottom: 20px;
-            text-align: justify;
-        }
-        .articles {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-        }
-        .articles h2 {
-            color: #2c3e50;
-            font-size: 1.2em;
-        }
-        .articles ul {
-            list-style: none;
-            padding: 0;
-        }
-        .articles li {
-            margin: 10px 0;
-        }
-        .articles a {
-            color: #3498db;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .articles a:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
+{% extends "base.html.tera" %}
+
+{% block title %}Classic Literature Archive{% endblock title %}
+
+{% block content %}
     <h1>Classic Literature Archive</h1>
     
-    <div class="intro">
+    <div class="intro" style="margin: 30px 0; font-style: italic; color: #555;">
         Welcome to our curated collection of classic literature. Explore timeless stories and profound insights from the world's greatest authors.
     </div>
     
@@ -66,7 +13,7 @@
     <p>{{ paragraph }}</p>
     {% endfor %}
     
-    <div class="articles">
+    <div class="links">
         <h2>Featured Articles</h2>
         <ul>
             {% for link in links %}
@@ -74,5 +21,13 @@
             {% endfor %}
         </ul>
     </div>
-</body>
-</html>
+    
+    <div class="links" style="margin-top: 30px;">
+        <h2>Poetry & Reflections</h2>
+        <ul>
+            {% for haiku_link in haiku_links %}
+            <li><a href="{{ haiku_link.1 }}" rel="nofollow noopener noreferrer" style="font-style: italic;">{{ haiku_link.0 }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock content %}
