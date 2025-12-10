@@ -1,0 +1,382 @@
+{% extends "base.html.tera" %}
+
+{% block title %}{{ user.display_name }} (@{{ user.username }}) | SinkNet{% endblock title %}
+
+{% block extra_styles %}
+.profile-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.profile-header {
+    background: linear-gradient(135deg, #1da1f2 0%, #0d8ecf 100%);
+    height: 150px;
+    border-radius: 12px 12px 0 0;
+}
+
+.profile-info {
+    background: white;
+    border: 1px solid #e1e8ed;
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 15px 20px 20px;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.profile-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 4px solid white;
+    position: absolute;
+    top: -50px;
+    left: 20px;
+    background: #e1e8ed;
+}
+
+.profile-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 40px;
+}
+
+.follow-btn {
+    background: #1da1f2;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.95em;
+}
+
+.follow-btn:hover {
+    background: #0d8ecf;
+}
+
+.profile-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.profile-name h1 {
+    border: none;
+    margin: 0;
+    padding: 0;
+    font-size: 1.4em;
+}
+
+.verified-badge {
+    color: #1da1f2;
+    font-size: 1.2em;
+}
+
+.profile-username {
+    color: #657786;
+    margin-bottom: 15px;
+}
+
+.profile-bio {
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.profile-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    color: #657786;
+    font-size: 0.9em;
+    margin-bottom: 15px;
+}
+
+.profile-meta span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.profile-stats {
+    display: flex;
+    gap: 20px;
+}
+
+.stat {
+    color: #657786;
+}
+
+.stat strong {
+    color: #14171a;
+}
+
+.stat a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.stat a:hover {
+    text-decoration: underline;
+}
+
+.profile-tabs {
+    display: flex;
+    border-bottom: 1px solid #e1e8ed;
+    margin-bottom: 15px;
+}
+
+.tab {
+    flex: 1;
+    text-align: center;
+    padding: 15px;
+    color: #657786;
+    text-decoration: none;
+    font-weight: bold;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.tab:hover {
+    background: #f5f8fa;
+    color: #1da1f2;
+}
+
+.tab.active {
+    color: #1da1f2;
+    border-bottom-color: #1da1f2;
+}
+
+.post-card {
+    background: white;
+    border: 1px solid #e1e8ed;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 15px;
+    transition: box-shadow 0.2s;
+}
+
+.post-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.post-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    margin-right: 12px;
+    background: #e1e8ed;
+}
+
+.user-info {
+    flex: 1;
+}
+
+.display-name {
+    font-weight: bold;
+    color: #14171a;
+    text-decoration: none;
+}
+
+.display-name:hover {
+    text-decoration: underline;
+}
+
+.username {
+    color: #657786;
+    font-size: 0.9em;
+}
+
+.username a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.post-time {
+    color: #657786;
+    font-size: 0.85em;
+}
+
+.post-content {
+    margin-bottom: 12px;
+    line-height: 1.5;
+    color: #14171a;
+}
+
+.post-content a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.post-image {
+    width: 100%;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    border: 1px solid #e1e8ed;
+}
+
+.post-actions {
+    display: flex;
+    justify-content: space-between;
+    color: #657786;
+    font-size: 0.9em;
+    padding-top: 10px;
+    border-top: 1px solid #e1e8ed;
+}
+
+.action {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 20px;
+    transition: all 0.2s;
+}
+
+.action:hover {
+    background: #f5f8fa;
+}
+
+.action.reply:hover {
+    color: #1da1f2;
+    background: rgba(29, 161, 242, 0.1);
+}
+
+.action.repost:hover {
+    color: #17bf63;
+    background: rgba(23, 191, 99, 0.1);
+}
+
+.action.like:hover {
+    color: #e0245e;
+    background: rgba(224, 36, 94, 0.1);
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 15px;
+    color: #1da1f2;
+    text-decoration: none;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+.note-box {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+    color: #856404;
+}
+{% endblock extra_styles %}
+
+{% block content %}
+<div class="profile-container">
+    <a href="/social" class="back-link" rel="nofollow noopener noreferrer">← Back to feed</a>
+    
+    <div class="note-box">
+        <strong>Note:</strong> This is a procedurally generated profile. This user does not exist.
+    </div>
+    
+    <div class="profile-header"></div>
+    
+    <div class="profile-info">
+        <img src="/social/avatar/{{ user.username }}.png" alt="" class="profile-avatar">
+        
+        <div class="profile-actions">
+            <button class="follow-btn">Follow</button>
+        </div>
+        
+        <div class="profile-name">
+            <h1>{{ user.display_name }}</h1>
+            {% if user.verified %}<span class="verified-badge">✓</span>{% endif %}
+        </div>
+        
+        <div class="profile-username">@{{ user.username }}</div>
+        
+        <div class="profile-bio">{{ user.bio }}</div>
+        
+        <div class="profile-meta">
+            <span>📅 Joined {{ user.join_date }}</span>
+        </div>
+        
+        <div class="profile-stats">
+            <span class="stat">
+                <a href="/social/user/{{ user.username }}/following" rel="nofollow noopener noreferrer">
+                    <strong>{{ user.following }}</strong> Following
+                </a>
+            </span>
+            <span class="stat">
+                <a href="/social/user/{{ user.username }}/followers" rel="nofollow noopener noreferrer">
+                    <strong>{{ user.followers }}</strong> Followers
+                </a>
+            </span>
+        </div>
+    </div>
+    
+    <div class="profile-tabs">
+        <a href="/social/user/{{ user.username }}" class="tab active" rel="nofollow noopener noreferrer">Posts</a>
+        <a href="/social/user/{{ user.username }}/replies" class="tab" rel="nofollow noopener noreferrer">Replies</a>
+        <a href="/social/user/{{ user.username }}/media" class="tab" rel="nofollow noopener noreferrer">Media</a>
+        <a href="/social/user/{{ user.username }}/likes" class="tab" rel="nofollow noopener noreferrer">Likes</a>
+    </div>
+    
+    {% for post in posts %}
+    <article class="post-card">
+        <div class="post-header">
+            <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">
+                <img src="/social/avatar/{{ post.author.username }}.png" alt="" class="avatar">
+            </a>
+            <div class="user-info">
+                <a href="/social/user/{{ post.author.username }}" class="display-name" rel="nofollow noopener noreferrer">
+                    {{ post.author.display_name }}
+                    {% if post.author.verified %}<span class="verified-badge" style="color: #1da1f2;">✓</span>{% endif %}
+                </a>
+                <div class="username">
+                    <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">@{{ post.author.username }}</a>
+                    · <span class="post-time">{{ post.relative_time }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <a href="/social/post/{{ post.id }}" class="post-content" rel="nofollow noopener noreferrer">
+            {{ post.content }}
+        </a>
+        
+        {% if post.has_image %}
+        <a href="/social/post/{{ post.id }}" rel="nofollow noopener noreferrer">
+            <img src="/social/media/{{ post.image_id }}.png" alt="Post image" class="post-image">
+        </a>
+        {% endif %}
+        
+        <div class="post-actions">
+            <span class="action reply">
+                <span>💬</span>
+                <span>{{ post.replies }}</span>
+            </span>
+            <span class="action repost">
+                <span>🔁</span>
+                <span>{{ post.reposts }}</span>
+            </span>
+            <span class="action like">
+                <span>❤️</span>
+                <span>{{ post.likes }}</span>
+            </span>
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% endblock content %}

@@ -43,4 +43,13 @@
             {% endfor %}
         </ul>
     </div>
+    
+    <div class="links" style="margin-top: 30px;">
+        <h2>Community & Discussion</h2>
+        <ul>
+            <li><a href="/social" rel="nofollow noopener noreferrer">🐦 SinkNet Social Feed</a> - See what the community is sharing</li>
+            <li><a href="/social/user/cosmic_dreamer" rel="nofollow noopener noreferrer">Featured: @cosmic_dreamer</a></li>
+            <li><a href="/social/user/silent_river42" rel="nofollow noopener noreferrer">Featured: @silent_river42</a></li>
+        </ul>
+    </div>
 {% endblock content %}

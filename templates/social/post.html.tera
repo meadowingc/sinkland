@@ -1,0 +1,411 @@
+{% extends "base.html.tera" %}
+
+{% block title %}{{ post.author.display_name }} on SinkNet: "{{ post.content | truncate(length=50) }}"{% endblock title %}
+
+{% block extra_styles %}
+.post-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 15px;
+    color: #1da1f2;
+    text-decoration: none;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+.main-post {
+    background: white;
+    border: 1px solid #e1e8ed;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.post-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    margin-right: 12px;
+    background: #e1e8ed;
+}
+
+.avatar.large {
+    width: 56px;
+    height: 56px;
+}
+
+.user-info {
+    flex: 1;
+}
+
+.display-name {
+    font-weight: bold;
+    color: #14171a;
+    text-decoration: none;
+    font-size: 1.1em;
+}
+
+.display-name:hover {
+    text-decoration: underline;
+}
+
+.verified-badge {
+    color: #1da1f2;
+    margin-left: 4px;
+}
+
+.username {
+    color: #657786;
+    font-size: 0.95em;
+}
+
+.username a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.username a:hover {
+    text-decoration: underline;
+}
+
+.post-content {
+    font-size: 1.3em;
+    line-height: 1.5;
+    margin-bottom: 15px;
+    color: #14171a;
+}
+
+.post-image {
+    width: 100%;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    border: 1px solid #e1e8ed;
+}
+
+.post-meta {
+    color: #657786;
+    font-size: 0.9em;
+    padding: 15px 0;
+    border-bottom: 1px solid #e1e8ed;
+}
+
+.post-stats {
+    display: flex;
+    gap: 20px;
+    padding: 15px 0;
+    border-bottom: 1px solid #e1e8ed;
+}
+
+.stat {
+    color: #657786;
+}
+
+.stat strong {
+    color: #14171a;
+}
+
+.post-actions {
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0;
+}
+
+.action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 10px 20px;
+    border-radius: 25px;
+    transition: all 0.2s;
+    color: #657786;
+    font-size: 1em;
+}
+
+.action:hover {
+    background: #f5f8fa;
+}
+
+.action.reply:hover {
+    color: #1da1f2;
+    background: rgba(29, 161, 242, 0.1);
+}
+
+.action.repost:hover {
+    color: #17bf63;
+    background: rgba(23, 191, 99, 0.1);
+}
+
+.action.like:hover {
+    color: #e0245e;
+    background: rgba(224, 36, 94, 0.1);
+}
+
+.comments-section {
+    margin-top: 20px;
+}
+
+.comments-header {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #14171a;
+}
+
+.comment-card {
+    background: white;
+    border: 1px solid #e1e8ed;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 10px;
+}
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.comment-content {
+    margin-bottom: 10px;
+    line-height: 1.5;
+    color: #14171a;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 20px;
+    color: #657786;
+    font-size: 0.85em;
+}
+
+.comment-action {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.comment-action:hover {
+    color: #1da1f2;
+}
+
+.reply-box {
+    background: #f5f8fa;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 12px;
+}
+
+.reply-input {
+    flex: 1;
+    border: 1px solid #e1e8ed;
+    border-radius: 20px;
+    padding: 12px 16px;
+    font-size: 1em;
+    outline: none;
+}
+
+.reply-input:focus {
+    border-color: #1da1f2;
+}
+
+.reply-btn {
+    background: #1da1f2;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.reply-btn:hover {
+    background: #0d8ecf;
+}
+
+.note-box {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+    color: #856404;
+}
+
+.related-posts {
+    background: #f5f8fa;
+    border-radius: 12px;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+.related-posts h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.1em;
+    color: #14171a;
+}
+
+.related-post {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #e1e8ed;
+    text-decoration: none;
+}
+
+.related-post:last-child {
+    border-bottom: none;
+}
+
+.related-post:hover {
+    background: rgba(0,0,0,0.02);
+}
+
+.related-post .avatar {
+    width: 36px;
+    height: 36px;
+}
+
+.related-post .user-info {
+    flex: 1;
+}
+
+.related-post .display-name {
+    font-size: 0.95em;
+}
+
+.related-post .preview {
+    color: #14171a;
+    font-size: 0.9em;
+    margin-top: 3px;
+}
+{% endblock extra_styles %}
+
+{% block content %}
+<div class="post-container">
+    <a href="/social" class="back-link" rel="nofollow noopener noreferrer">← Back to feed</a>
+    
+    <article class="main-post">
+        <div class="post-header">
+            <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">
+                <img src="/social/avatar/{{ post.author.username }}.png" alt="" class="avatar large">
+            </a>
+            <div class="user-info">
+                <a href="/social/user/{{ post.author.username }}" class="display-name" rel="nofollow noopener noreferrer">
+                    {{ post.author.display_name }}
+                    {% if post.author.verified %}<span class="verified-badge">✓</span>{% endif %}
+                </a>
+                <div class="username">
+                    <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">@{{ post.author.username }}</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="post-content">
+            {{ post.content }}
+        </div>
+        
+        {% if post.has_image %}
+        <img src="/social/media/{{ post.image_id }}.png" alt="Post image" class="post-image">
+        {% endif %}
+        
+        <div class="post-meta">
+            {{ post.timestamp }} · <span style="color: #1da1f2;">SinkNet Web App</span>
+        </div>
+        
+        <div class="post-stats">
+            <span class="stat"><strong>{{ post.reposts }}</strong> Reposts</span>
+            <span class="stat"><strong>{{ post.likes }}</strong> Likes</span>
+        </div>
+        
+        <div class="post-actions">
+            <span class="action reply">
+                <span>💬</span>
+                <span>Reply</span>
+            </span>
+            <span class="action repost">
+                <span>🔁</span>
+                <span>Repost</span>
+            </span>
+            <span class="action like">
+                <span>❤️</span>
+                <span>Like</span>
+            </span>
+        </div>
+    </article>
+    
+    <div class="comments-section">
+        <div class="reply-box">
+            <img src="/social/avatar/guest.png" alt="" class="avatar">
+            <input type="text" class="reply-input" placeholder="Post your reply" disabled>
+            <button class="reply-btn" disabled>Reply</button>
+        </div>
+        
+        <div class="comments-header">{{ comments | length }} Replies</div>
+        
+        {% for comment in comments %}
+        <article class="comment-card">
+            <div class="comment-header">
+                <a href="/social/user/{{ comment.author.username }}" rel="nofollow noopener noreferrer">
+                    <img src="/social/avatar/{{ comment.author.username }}.png" alt="" class="avatar">
+                </a>
+                <div class="user-info">
+                    <a href="/social/user/{{ comment.author.username }}" class="display-name" rel="nofollow noopener noreferrer">
+                        {{ comment.author.display_name }}
+                        {% if comment.author.verified %}<span class="verified-badge">✓</span>{% endif %}
+                    </a>
+                    <div class="username">
+                        <a href="/social/user/{{ comment.author.username }}" rel="nofollow noopener noreferrer">@{{ comment.author.username }}</a>
+                        · {{ comment.relative_time }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="comment-content">
+                Replying to <a href="/social/user/{{ post.author.username }}" style="color: #1da1f2;" rel="nofollow noopener noreferrer">@{{ post.author.username }}</a>
+                <br><br>
+                {{ comment.content }}
+            </div>
+            
+            <div class="comment-actions">
+                <span class="comment-action">💬 {{ comment.likes }}</span>
+                <span class="comment-action">🔁</span>
+                <span class="comment-action">❤️ {{ comment.likes }}</span>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    
+    <div class="related-posts">
+        <h3>More posts you might like</h3>
+        {% for related in related_posts %}
+        <a href="/social/post/{{ related.id }}" class="related-post" rel="nofollow noopener noreferrer">
+            <img src="/social/avatar/{{ related.author.username }}.png" alt="" class="avatar">
+            <div class="user-info">
+                <span class="display-name">
+                    {{ related.author.display_name }}
+                    {% if related.author.verified %}<span class="verified-badge">✓</span>{% endif %}
+                </span>
+                <div class="preview">{{ related.content | truncate(length=60) }}</div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock content %}

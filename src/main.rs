@@ -1,15 +1,28 @@
+mod data;
+mod generators;
+
+use data::{BOOK_DATA, HAIKU_DATA};
+use generators::images::{generate_avatar_from_seed, generate_image_from_seed};
+use generators::social::{
+    generate_comments_random, generate_feed_random, generate_post_random,
+    generate_suggested_users_random, generate_trending_topics,
+    generate_user_random, generate_user_posts_random,
+};
+
+use image::ImageFormat;
 use once_cell::sync::Lazy;
 use poem::{
-    Route, Server,
     endpoint::StaticFilesEndpoint,
     error::InternalServerError,
     get, handler,
+    http::StatusCode,
     listener::TcpListener,
     web::{Html, Path},
+    Response, Route, Server,
 };
-use rand::Rng;
 use rand::seq::SliceRandom;
-use serde::Deserialize;
+use rand::Rng;
+use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tera::{Context, Tera};
 
@@ -25,199 +38,10 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
     tera
 });
 
-// Atomic counter for trap visits
+// Atomic counters for visits
 static TRAP_VISITS: AtomicUsize = AtomicUsize::new(0);
 static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(0);
-
-// Haiku data structure
-#[derive(Deserialize)]
-struct HaikuData {
-    lines_5: Vec<String>,
-    lines_7: Vec<String>,
-}
-
-static HAIKU_DATA: Lazy<HaikuData> = Lazy::new(|| {
-    let haiku_file = "assets/haikus.json";
-    let content = std::fs::read_to_string(haiku_file).expect("Failed to read haikus.json");
-    let mut data: HaikuData = serde_json::from_str(&content).expect("Failed to parse haikus.json");
-
-    // Deduplicate lines
-    use std::collections::HashSet;
-    let mut seen_5 = HashSet::new();
-    let mut seen_7 = HashSet::new();
-
-    data.lines_5.retain(|line| seen_5.insert(line.clone()));
-    data.lines_7.retain(|line| seen_7.insert(line.clone()));
-
-    data
-});
-
-// Book data structure
-struct BookData {
-    titles: Vec<String>,
-    sentences: Vec<String>,
-}
-
-static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
-    let mut titles = Vec::new();
-    let mut sentences = Vec::new();
-
-    // Read all .txt files from the books directory
-    let books_dir = "assets/books";
-    let book_files: Vec<_> = std::fs::read_dir(books_dir)
-        .expect("Failed to read books directory")
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.extension()? == "txt" {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    for file_path in &book_files {
-        let content = match std::fs::read_to_string(file_path) {
-            Ok(c) => c,
-            Err(_) => {
-                println!("Warning: Could not read {}", file_path.display());
-                continue;
-            }
-        };
-
-        // Find the actual book content (after START marker, before END marker)
-        let start_marker = "*** START OF";
-        let end_marker = "*** END OF";
-
-        let start_pos = content
-            .find(start_marker)
-            .map(|pos| {
-                // Find the end of the line with START marker, then skip to next line
-                content[pos..]
-                    .find('\n')
-                    .map(|n| pos + n + 1)
-                    .unwrap_or(pos)
-            })
-            .unwrap_or(0);
-
-        let end_pos = content.find(end_marker).unwrap_or(content.len());
-        let book_content = &content[start_pos..end_pos];
-
-        // Extract chapter titles (all caps lines with multiple words)
-        for line in book_content.lines() {
-            let trimmed = line.trim();
-            // Chapter titles: all caps, multiple words, reasonable length
-            if trimmed.len() > 5
-                && trimmed.len() < 100
-                && trimmed.chars().all(|c| {
-                    c.is_uppercase() || c.is_whitespace() || c == '\'' || c == '.' || c == '-'
-                })
-                && trimmed.chars().filter(|c| c.is_alphabetic()).count() > 5
-                && trimmed.split_whitespace().count() >= 2
-            {
-                titles.push(trimmed.to_string());
-            }
-        }
-
-        // Extract paragraphs and split into sentences, collecting interesting short sentences as titles
-        let mut current_para = String::new();
-        for line in book_content.lines() {
-            let trimmed = line.trim();
-
-            if trimmed.is_empty() {
-                if !current_para.is_empty() && current_para.len() > 50 {
-                    // Split paragraph into sentences
-                    let para_sentences = split_into_sentences(&current_para);
-                    sentences.extend(para_sentences);
-                }
-                current_para.clear();
-            } else {
-                if !current_para.is_empty() {
-                    current_para.push(' ');
-                }
-                current_para.push_str(trimmed);
-            }
-        }
-
-        // Add the last paragraph's sentences if it exists
-        if !current_para.is_empty() && current_para.len() > 50 {
-            let para_sentences = split_into_sentences(&current_para);
-            sentences.extend(para_sentences);
-        }
-    }
-
-    // Extract interesting short sentences to use as titles
-    for sentence in &sentences {
-        // Good title candidates: 30-80 chars, starts with capital, has 3-10 words
-        let word_count = sentence.split_whitespace().count();
-        if sentence.len() >= 30
-            && sentence.len() <= 80
-            && word_count >= 3
-            && word_count <= 10
-            && sentence.chars().next().map_or(false, |c| c.is_uppercase())
-        {
-            // Clean up trailing weird punctuation combinations
-            let cleaned = sentence
-                .trim_end_matches(&['.', '"', '\'', '-', '!', '?', ',', ';', ':', '”'][..])
-                .trim_end();
-
-            // Only add if it still has reasonable length and ends properly
-            if cleaned.len() >= 25 && cleaned.split_whitespace().count() >= 3 {
-                titles.push(cleaned.to_string());
-            }
-        }
-    }
-
-    // Deduplicate titles while preserving order
-    let mut seen = std::collections::HashSet::new();
-    titles.retain(|title| seen.insert(title.clone()));
-
-    BookData { titles, sentences }
-});
-
-// Helper function to split text into sentences
-fn split_into_sentences(text: &str) -> Vec<String> {
-    let mut sentences = Vec::new();
-    let mut current = String::new();
-    let chars: Vec<char> = text.chars().collect();
-
-    for i in 0..chars.len() {
-        current.push(chars[i]);
-
-        // Sentence endings: . ! ? followed by space and capital letter, or end of text
-        if chars[i] == '.' || chars[i] == '!' || chars[i] == '?' {
-            // Check if this is the end of a sentence
-            let is_end = if i + 1 >= chars.len() {
-                true // End of text
-            } else if i + 2 < chars.len()
-                && chars[i + 1].is_whitespace()
-                && chars[i + 2].is_uppercase()
-            {
-                true // Followed by space and capital
-            } else {
-                false
-            };
-
-            if is_end {
-                let trimmed = current.trim().to_string();
-                if trimmed.len() > 20 {
-                    // Only keep substantial sentences
-                    sentences.push(trimmed);
-                }
-                current.clear();
-            }
-        }
-    }
-
-    // Add remaining text if any
-    let trimmed = current.trim().to_string();
-    if trimmed.len() > 20 {
-        sentences.push(trimmed);
-    }
-
-    sentences
-}
+static SOCIAL_VISITS: AtomicUsize = AtomicUsize::new(0);
 
 // Helper function to generate random paragraphs
 fn generate_random_paragraphs(
@@ -242,109 +66,99 @@ fn generate_random_paragraphs(
 // Helper function to add random inline links to paragraphs
 fn add_inline_links_to_paragraphs(paragraphs: Vec<String>) -> Vec<String> {
     let mut rng = rand::thread_rng();
-    
-    paragraphs.into_iter().map(|paragraph| {
-        // Decide how many words to link in this paragraph (0, 1, 2, or rarely 3)
-        // Weight towards fewer links: 40% chance of 0, 30% of 1, 25% of 2, 5% of 3
-        let num_links = match rng.gen_range(0..100) {
-            0..40 => 0,
-            40..70 => 1,
-            70..95 => 2,
-            _ => 3,
-        };
-        
-        if num_links == 0 {
-            return paragraph;
-        }
-        
-        // Split paragraph into words while preserving punctuation
-        let words: Vec<&str> = paragraph.split_whitespace().collect();
-        
-        // Need at least 10 words to add links
-        if words.len() < 10 {
-            return paragraph;
-        }
-        
-        // Select random word positions to link (avoid first and last few words)
-        let linkable_start = 2;
-        let linkable_end = words.len().saturating_sub(2);
-        
-        if linkable_end <= linkable_start {
-            return paragraph;
-        }
-        
-        let mut link_positions: Vec<usize> = (linkable_start..linkable_end)
-            .collect();
-        link_positions.shuffle(&mut rng);
-        
-        // Take only the number of positions we want to link, ensuring they're spaced out
-        let mut selected_positions = Vec::new();
-        for pos in link_positions {
-            if selected_positions.is_empty() || 
-               selected_positions.iter().all(|&p: &usize| (p as i32 - pos as i32).abs() > 5) {
-                selected_positions.push(pos);
-                if selected_positions.len() >= num_links {
-                    break;
+
+    paragraphs
+        .into_iter()
+        .map(|paragraph| {
+            let num_links = match rng.gen_range(0..100) {
+                0..=39 => 0,
+                40..=69 => 1,
+                70..=94 => 2,
+                _ => 3,
+            };
+
+            if num_links == 0 {
+                return paragraph;
+            }
+
+            let words: Vec<&str> = paragraph.split_whitespace().collect();
+
+            if words.len() < 10 {
+                return paragraph;
+            }
+
+            let linkable_start = 2;
+            let linkable_end = words.len().saturating_sub(2);
+
+            if linkable_end <= linkable_start {
+                return paragraph;
+            }
+
+            let mut link_positions: Vec<usize> = (linkable_start..linkable_end).collect();
+            link_positions.shuffle(&mut rng);
+
+            let mut selected_positions = Vec::new();
+            for pos in link_positions {
+                if selected_positions.is_empty()
+                    || selected_positions
+                        .iter()
+                        .all(|&p: &usize| (p as i32 - pos as i32).abs() > 5)
+                {
+                    selected_positions.push(pos);
+                    if selected_positions.len() >= num_links {
+                        break;
+                    }
                 }
             }
-        }
-        
-        selected_positions.sort();
-        
-        // Generate the links
-        let links = generate_random_links(selected_positions.len());
-        
-        // Build the new paragraph with inline links
-        let mut result = String::new();
-        let mut link_index = 0;
-        
-        for (i, word) in words.iter().enumerate() {
-            if !result.is_empty() {
-                result.push(' ');
-            }
-            
-            if let Some(&pos) = selected_positions.get(link_index) {
-                if i == pos && link_index < links.len() {
-                    // Extract the word without trailing punctuation
-                    let (clean_word, punctuation) = extract_word_and_punctuation(word);
-                    
-                    // Create the link
-                    result.push_str(&format!(
-                        r#"<a href="{}" rel="nofollow noopener noreferrer">{}</a>{}"#,
-                        links[link_index].1,
-                        clean_word,
-                        punctuation
-                    ));
-                    link_index += 1;
+
+            selected_positions.sort();
+
+            let links = generate_random_links(selected_positions.len());
+
+            let mut result = String::new();
+            let mut link_index = 0;
+
+            for (i, word) in words.iter().enumerate() {
+                if !result.is_empty() {
+                    result.push(' ');
+                }
+
+                if let Some(&pos) = selected_positions.get(link_index) {
+                    if i == pos && link_index < links.len() {
+                        let (clean_word, punctuation) = extract_word_and_punctuation(word);
+
+                        result.push_str(&format!(
+                            r#"<a href="{}" rel="nofollow noopener noreferrer">{}</a>{}"#,
+                            links[link_index].1, clean_word, punctuation
+                        ));
+                        link_index += 1;
+                    } else {
+                        result.push_str(word);
+                    }
                 } else {
                     result.push_str(word);
                 }
-            } else {
-                result.push_str(word);
             }
-        }
-        
-        result
-    }).collect()
+
+            result
+        })
+        .collect()
 }
 
-// Helper function to extract word and trailing punctuation
 fn extract_word_and_punctuation(word: &str) -> (String, String) {
     let mut chars: Vec<char> = word.chars().collect();
     let mut punctuation = String::new();
-    
-    // Extract trailing punctuation
+
     while !chars.is_empty() && !chars.last().unwrap().is_alphanumeric() {
         if let Some(ch) = chars.pop() {
             punctuation.insert(0, ch);
         }
     }
-    
+
     let clean_word: String = chars.into_iter().collect();
     (clean_word, punctuation)
 }
 
-// Helper function to generate random links with unique titles
 fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
     let mut rng = rand::thread_rng();
     let num_links = num_links.min(BOOK_DATA.titles.len());
@@ -353,20 +167,19 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
         .titles
         .choose_multiple(&mut rng, num_links)
         .map(|link_title| {
-            // Generate random Unix timestamp from 0 (1970-01-01) to now
-            let random_timestamp = rng.gen_range(0..std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs());
-            
-            // Convert to date (days since epoch)
+            let random_timestamp = rng.gen_range(
+                0..std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            );
+
             let days = random_timestamp / 86400;
             let year = 1970 + (days / 365);
             let day_of_year = days % 365;
             let month = (day_of_year / 30).min(11) + 1;
             let day = (day_of_year % 30) + 1;
-            
-            // Create URL-friendly slug: lowercase, spaces to hyphens, URL encoded
+
             let slug = link_title
                 .to_lowercase()
                 .trim()
@@ -374,56 +187,57 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
                 .replace('.', "");
             let url_slug = urlencoding::encode(&slug);
 
-            (link_title.clone(), format!("/blog/{:04}/{:02}/{:02}/{}", year, month, day, url_slug))
+            (
+                link_title.clone(),
+                format!("/blog/{:04}/{:02}/{:02}/{}", year, month, day, url_slug),
+            )
         })
         .collect()
 }
 
-// Helper function to generate haiku-based links
 fn generate_haiku_links(num_links: usize) -> Vec<(String, String)> {
     let mut rng = rand::thread_rng();
 
-    // Use 5-syllable haiku lines as link text (they're shorter and work better as links)
     let available_lines = HAIKU_DATA.lines_5.len().min(num_links);
 
     HAIKU_DATA
         .lines_5
         .choose_multiple(&mut rng, available_lines)
         .map(|link_text| {
-            // Generate random Unix timestamp from 0 (1970-01-01) to now
-            let random_timestamp = rng.gen_range(0..std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs());
-            
-            // Convert to date (days since epoch)
+            let random_timestamp = rng.gen_range(
+                0..std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            );
+
             let days = random_timestamp / 86400;
             let year = 1970 + (days / 365);
             let day_of_year = days % 365;
             let month = (day_of_year / 30).min(11) + 1;
             let day = (day_of_year % 30) + 1;
-            
-            // Create URL-friendly slug from the haiku line
+
             let slug = link_text
                 .to_lowercase()
                 .trim()
                 .replace(' ', "-")
-                .replace(['.', ',', '!', '?', ':', ';', '\"', '\''], "")
+                .replace(['.', ',', '!', '?', ':', ';', '"', '\''], "")
                 .chars()
                 .filter(|c| c.is_alphanumeric() || *c == '-')
                 .collect::<String>();
             let url_slug = urlencoding::encode(&slug);
 
-            (link_text.clone(), format!("/haiku/{:04}/{:02}/{:02}/{}", year, month, day, url_slug))
+            (
+                link_text.clone(),
+                format!("/haiku/{:04}/{:02}/{:02}/{}", year, month, day, url_slug),
+            )
         })
         .collect()
 }
 
-// Helper function to generate a random haiku
 fn generate_random_haiku() -> String {
     let mut rng = rand::thread_rng();
 
-    // Pick two different 5-syllable lines
     let line1 = HAIKU_DATA
         .lines_5
         .choose(&mut rng)
@@ -436,7 +250,6 @@ fn generate_random_haiku() -> String {
         .map(|s| s.as_str())
         .unwrap_or("Fades into the mist");
 
-    // Ensure line3 is different from line1
     while line3 == line1 && HAIKU_DATA.lines_5.len() > 1 {
         line3 = HAIKU_DATA
             .lines_5
@@ -445,7 +258,6 @@ fn generate_random_haiku() -> String {
             .unwrap_or("Fades into the mist");
     }
 
-    // Pick one 7-syllable line
     let line2 = HAIKU_DATA
         .lines_7
         .choose(&mut rng)
@@ -455,28 +267,24 @@ fn generate_random_haiku() -> String {
     format!("{}\n{}\n{}", line1, line2, line3)
 }
 
+// ============ BLOG/BOOK HANDLERS ============
+
 #[handler]
 fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
-    // Increment the visit counter
     let visit_count = TRAP_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
 
     let mut rng = rand::thread_rng();
 
-    // Pick random title
     let title = BOOK_DATA
         .titles
         .choose(&mut rng)
         .unwrap_or(&"Mysterious Content".to_string())
         .clone();
 
-    // Pick 4-5 random paragraphs, each made of 3-6 random sentences
     let num_paragraphs = rng.gen_range(4..=5);
     let paragraphs = generate_random_paragraphs(num_paragraphs, (3, 6));
-    
-    // Add random inline links to paragraphs
     let paragraphs = add_inline_links_to_paragraphs(paragraphs);
 
-    // Generate 2-7 random links
     let num_links = rng.gen_range(2..=7);
     let links = generate_random_links(num_links);
 
@@ -496,18 +304,13 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
 fn index() -> Result<Html<String>, poem::Error> {
     let mut rng = rand::thread_rng();
 
-    // Pick 1-2 random paragraphs for preview
     let num_paragraphs = rng.gen_range(1..=2);
     let paragraphs = generate_random_paragraphs(num_paragraphs, (2, 4));
-    
-    // Add random inline links to paragraphs
     let paragraphs = add_inline_links_to_paragraphs(paragraphs);
 
-    // Generate 5-10 random links to trap pages
     let num_links = rng.gen_range(5..=10);
     let links = generate_random_links(num_links);
 
-    // Generate 3-5 haiku links
     let num_haiku_links = rng.gen_range(3..=5);
     let haiku_links = generate_haiku_links(num_haiku_links);
 
@@ -529,15 +332,12 @@ async fn robots_txt() -> &'static str {
 
 #[handler]
 fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
-    // Increment the haiku visit counter
     let visit_count = HAIKU_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
 
     let mut rng = rand::thread_rng();
 
-    // Generate a random haiku
     let haiku = generate_random_haiku();
 
-    // Pick a random title from haiku lines
     let title = HAIKU_DATA
         .lines_5
         .choose(&mut rng)
@@ -545,7 +345,6 @@ fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
         .unwrap_or("Daily Haiku")
         .to_string();
 
-    // Generate 3-7 random haiku links
     let num_links = rng.gen_range(3..=7);
     let links = generate_haiku_links(num_links);
 
@@ -561,6 +360,147 @@ fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
         .map(Html)
 }
 
+// ============ SOCIAL MEDIA HANDLERS ============
+
+#[handler]
+fn social_feed() -> Result<Html<String>, poem::Error> {
+    let _visit_count = SOCIAL_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
+
+    // Generate fresh random content on every page visit
+    let mut rng = rand::thread_rng();
+    let posts = generate_feed_random(&mut rng, 15);
+    let trending = generate_trending_topics(&mut rng, 5);
+    let suggested_users = generate_suggested_users_random(&mut rng, 3);
+
+    let mut context = Context::new();
+    context.insert("posts", &posts);
+    context.insert("trending", &trending);
+    context.insert("suggested_users", &suggested_users);
+
+    TEMPLATES
+        .render("social/feed.html.tera", &context)
+        .map_err(InternalServerError)
+        .map(Html)
+}
+
+#[handler]
+fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poem::Error> {
+    // Generate fresh random content on every page visit
+    let mut rng = rand::thread_rng();
+    let user = generate_user_random(&mut rng, &username);
+    let posts = generate_user_posts_random(&mut rng, &user, 10);
+
+    let mut context = Context::new();
+    context.insert("user", &user);
+    context.insert("posts", &posts);
+
+    TEMPLATES
+        .render("social/profile.html.tera", &context)
+        .map_err(InternalServerError)
+        .map(Html)
+}
+
+#[handler]
+fn social_user_subpage(Path((username, _subpage)): Path<(String, String)>) -> Result<Html<String>, poem::Error> {
+    // Generate fresh random content on every page visit
+    let mut rng = rand::thread_rng();
+    let user = generate_user_random(&mut rng, &username);
+    let posts = generate_user_posts_random(&mut rng, &user, 10);
+
+    let mut context = Context::new();
+    context.insert("user", &user);
+    context.insert("posts", &posts);
+
+    TEMPLATES
+        .render("social/profile.html.tera", &context)
+        .map_err(InternalServerError)
+        .map(Html)
+}
+
+#[handler]
+fn social_post_page(Path(_post_id): Path<String>) -> Result<Html<String>, poem::Error> {
+    // Generate fresh random content on every page visit
+    let mut rng = rand::thread_rng();
+    let post = generate_post_random(&mut rng);
+    let comments = generate_comments_random(&mut rng, 8);
+    let related_posts = generate_feed_random(&mut rng, 5);
+
+    let mut context = Context::new();
+    context.insert("post", &post);
+    context.insert("comments", &comments);
+    context.insert("related_posts", &related_posts);
+
+    TEMPLATES
+        .render("social/post.html.tera", &context)
+        .map_err(InternalServerError)
+        .map(Html)
+}
+
+#[handler]
+fn social_search(Path(_query): Path<String>) -> Result<Html<String>, poem::Error> {
+    // Generate fresh random content on every page visit
+    let mut rng = rand::thread_rng();
+    let posts = generate_feed_random(&mut rng, 15);
+    let trending = generate_trending_topics(&mut rng, 5);
+    let suggested_users = generate_suggested_users_random(&mut rng, 3);
+
+    let mut context = Context::new();
+    context.insert("posts", &posts);
+    context.insert("trending", &trending);
+    context.insert("suggested_users", &suggested_users);
+
+    TEMPLATES
+        .render("social/feed.html.tera", &context)
+        .map_err(InternalServerError)
+        .map(Html)
+}
+
+// ============ IMAGE HANDLERS ============
+
+#[handler]
+fn social_media_image(Path(image_id): Path<String>) -> Response {
+    // Strip .png extension if present
+    let seed = image_id.trim_end_matches(".png");
+
+    let img = generate_image_from_seed(seed);
+
+    let mut buffer = Cursor::new(Vec::new());
+    if img.write_to(&mut buffer, ImageFormat::Png).is_err() {
+        return Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body("Failed to generate image");
+    }
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "image/png")
+        .header("Cache-Control", "public, max-age=86400")
+        .body(buffer.into_inner())
+}
+
+#[handler]
+fn social_avatar(Path(username): Path<String>) -> Response {
+    // Strip .png extension if present
+    let seed = username.trim_end_matches(".png");
+
+    let img = generate_avatar_from_seed(seed);
+
+    let mut buffer = Cursor::new(Vec::new());
+    if img.write_to(&mut buffer, ImageFormat::Png).is_err() {
+        return Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body("Failed to generate avatar");
+    }
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "image/png")
+        .header("Cache-Control", "public, max-age=86400")
+        .body(buffer.into_inner())
+}
+
+// ============ MAIN ============
+
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
     let app = Route::new()
@@ -568,13 +508,21 @@ async fn main() -> Result<(), std::io::Error> {
         .at("/", get(index))
         .at("/haiku/*slug", get(haiku_page))
         .at("/blog/*slug", get(scraper_trap))
-        .at("/robots.txt", get(robots_txt));
+        .at("/robots.txt", get(robots_txt))
+        // Social media routes
+        .at("/social", get(social_feed))
+        .at("/social/user/:username", get(social_user_profile))
+        .at("/social/user/:username/:subpage", get(social_user_subpage))
+        .at("/social/post/:post_id", get(social_post_page))
+        .at("/social/search/:query", get(social_search))
+        .at("/social/media/:image_id", get(social_media_image))
+        .at("/social/avatar/:username", get(social_avatar));
 
     const PORT: u16 = 43796;
 
     println!("Starting server on http://localhost:{}", PORT);
     println!(
-        "Loaded {} titles and {} sentences from 6 books",
+        "Loaded {} titles and {} sentences from books",
         BOOK_DATA.titles.len(),
         BOOK_DATA.sentences.len()
     );
@@ -584,6 +532,7 @@ async fn main() -> Result<(), std::io::Error> {
         HAIKU_DATA.lines_7.len(),
         HAIKU_DATA.lines_5.len() + HAIKU_DATA.lines_7.len()
     );
+    println!("Social media routes available at /social");
 
     let memory_usage = std::mem::size_of_val(&*BOOK_DATA.titles)
         + BOOK_DATA.titles.iter().map(|s| s.len()).sum::<usize>()
