@@ -291,31 +291,8 @@ fn add_hashtags_to_content<R: Rng>(rng: &mut R, content: &str) -> String {
 
 /// Extract leading and trailing punctuation from a word
 fn extract_punctuation(word: &str) -> (String, String) {
-    let chars: Vec<char> = word.chars().collect();
-    let mut prefix = String::new();
-    let mut suffix = String::new();
-    
-    // Find prefix punctuation
-    for c in chars.iter() {
-        if c.is_alphanumeric() {
-            break;
-        }
-        prefix.push(*c);
-    }
-    
-    // Find suffix punctuation
-    let mut end = chars.len();
-    for (i, c) in chars.iter().enumerate().rev() {
-        if c.is_alphanumeric() {
-            end = i + 1;
-            break;
-        }
-    }
-    
-    for c in &chars[end..] {
-        suffix.push(*c);
-    }
-    
+    let prefix: String = word.chars().take_while(|c| !c.is_alphanumeric()).collect();
+    let suffix: String = word.chars().rev().take_while(|c| !c.is_alphanumeric()).collect::<String>().chars().rev().collect();
     (prefix, suffix)
 }
 
@@ -417,10 +394,10 @@ fn generate_timestamp<R: Rng>(rng: &mut R) -> (String, String) {
         format!("{}mo", minutes_ago / 43800)
     };
 
-    // Generate a plausible date
-    let days_ago = minutes_ago / 1440;
-    let month = ((12 - (days_ago / 30) % 12) as u8).max(1);
-    let day = ((28 - days_ago % 28) as u8).max(1);
+    // Generate a plausible date by picking a random month and day
+    // This is simpler and produces valid-looking dates
+    let month = rng.gen_range(1..=12);
+    let day = rng.gen_range(1..=28); // Use 28 to be safe for all months
 
     let timestamp = format!("{} {}", month_name(month), day);
 
@@ -553,6 +530,11 @@ fn generate_image_alt<R: Rng>(rng: &mut R) -> String {
 
 /// Generate a random post (not seeded - fresh content)
 pub fn generate_post_random<R: Rng>(rng: &mut R) -> Post {
+    generate_post_random_with_image(rng, None)
+}
+
+/// Generate a random post, optionally forcing an image
+fn generate_post_random_with_image<R: Rng>(rng: &mut R, force_image: Option<bool>) -> Post {
     // Generate author
     let username = generate_username(rng);
     let author = generate_user_random(rng, &username);
@@ -561,10 +543,10 @@ pub fn generate_post_random<R: Rng>(rng: &mut R) -> Post {
     let base_content = generate_post_content(rng);
     let content = add_hashtags_to_content(rng, &base_content);
 
-    // Decide if this post has an image (30% chance)
-    let has_image = rng.gen_bool(0.3);
-    let random_id: u64 = rng.gen_range(0..u64::MAX);
+    // Decide if this post has an image (30% chance, or forced)
+    let has_image = force_image.unwrap_or_else(|| rng.gen_bool(0.3));
     let (image_id, image_alt) = if has_image {
+        let random_id: u64 = rng.gen_range(0..u64::MAX);
         (Some(format!("img_{:x}", random_id)), Some(generate_image_alt(rng)))
     } else {
         (None, None)
@@ -587,8 +569,7 @@ pub fn generate_post_random<R: Rng>(rng: &mut R) -> Post {
     let (timestamp, relative_time) = generate_timestamp(rng);
 
     // Generate random post ID
-    let random_post_id: u64 = rng.gen_range(0..u64::MAX);
-    let id = format!("{:x}", random_post_id);
+    let id = format!("{:x}", rng.gen_range(0..u64::MAX));
 
     Post {
         id,
@@ -676,17 +657,8 @@ pub fn generate_user_likes_random<R: Rng>(rng: &mut R, count: usize) -> Vec<Post
 pub fn generate_user_media_posts_random<R: Rng>(rng: &mut R, user: &User, count: usize) -> Vec<Post> {
     (0..count)
         .map(|_| {
-            let mut post = generate_post_random(rng);
+            let mut post = generate_post_random_with_image(rng, Some(true));
             post.author = user.clone();
-            // Force this post to have an image
-            post.has_image = true;
-            if post.image_id.is_none() {
-                let random_id: u64 = rng.gen_range(0..u64::MAX);
-                post.image_id = Some(format!("img_{:x}", random_id));
-            }
-            if post.image_alt.is_none() {
-                post.image_alt = Some(generate_image_alt(rng));
-            }
             post
         })
         .collect()
