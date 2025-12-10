@@ -17,8 +17,4 @@
             {% endfor %}
         </ul>
     </div>
-    
-    <div class="footer">
-        Total visitors to this collection: {{ visit_count }}
-    </div>
 {% endblock content %}

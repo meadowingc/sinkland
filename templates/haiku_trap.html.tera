@@ -36,8 +36,4 @@
             {% endfor %}
         </ul>
     </div>
-    
-    <div class="footer">
-        Contemplations shared: {{ visit_count }}
-    </div>
 {% endblock content %}
