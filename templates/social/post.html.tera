@@ -304,7 +304,7 @@
     <article class="main-post">
         <div class="post-header">
             <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">
-                <img src="/social/avatar/{{ post.author.username }}.png" alt="" class="avatar large">
+                <img src="/social/avatar/{{ post.author.username }}.png" alt="Avatar for {{ post.author.display_name }}" class="avatar large">
             </a>
             <div class="user-info">
                 <a href="/social/user/{{ post.author.username }}" class="display-name" rel="nofollow noopener noreferrer">
@@ -322,7 +322,7 @@
         </div>
         
         {% if post.has_image %}
-        <img src="/social/media/{{ post.image_id }}.png" alt="Post image" class="post-image">
+        <img src="/social/media/{{ post.image_id }}.png" alt="{{ post.image_alt | default(value='Post image') }}" class="post-image">
         {% endif %}
         
         <div class="post-meta">
@@ -352,7 +352,7 @@
     
     <div class="comments-section">
         <div class="reply-box">
-            <img src="/social/avatar/guest.png" alt="" class="avatar">
+            <img src="/social/avatar/guest.png" alt="Guest avatar" class="avatar">
             <input type="text" class="reply-input" placeholder="Post your reply" disabled>
             <button class="reply-btn" disabled>Reply</button>
         </div>
@@ -363,7 +363,7 @@
         <article class="comment-card">
             <div class="comment-header">
                 <a href="/social/user/{{ comment.author.username }}" rel="nofollow noopener noreferrer">
-                    <img src="/social/avatar/{{ comment.author.username }}.png" alt="" class="avatar">
+                    <img src="/social/avatar/{{ comment.author.username }}.png" alt="Avatar for {{ comment.author.display_name }}" class="avatar">
                 </a>
                 <div class="user-info">
                     <a href="/social/user/{{ comment.author.username }}" class="display-name" rel="nofollow noopener noreferrer">
@@ -396,7 +396,7 @@
         <h3>More posts you might like</h3>
         {% for related in related_posts %}
         <a href="/social/post/{{ related.id }}" class="related-post" rel="nofollow noopener noreferrer">
-            <img src="/social/avatar/{{ related.author.username }}.png" alt="" class="avatar">
+            <img src="/social/avatar/{{ related.author.username }}.png" alt="Avatar for {{ related.author.display_name }}" class="avatar">
             <div class="user-info">
                 <span class="display-name">
                     {{ related.author.display_name }}

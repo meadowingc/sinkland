@@ -5,6 +5,8 @@ use rand_chacha::ChaCha8Rng;
 
 pub const IMAGE_WIDTH: u32 = 400;
 pub const IMAGE_HEIGHT: u32 = 300;
+pub const BANNER_WIDTH: u32 = 600;
+pub const BANNER_HEIGHT: u32 = 200;
 
 type Color = [u8; 3];
 
@@ -37,6 +39,222 @@ pub fn generate_avatar_from_seed(seed: &str) -> RgbImage {
     
     // Avatars use a symmetric pattern for a more "icon-like" feel
     generate_symmetric_avatar(&mut rng)
+}
+
+/// Generate a profile banner/cover image based on username (deterministic, wide)
+pub fn generate_banner_from_seed(seed: &str) -> RgbImage {
+    let hash = simple_hash(seed);
+    let mut rng = ChaCha8Rng::seed_from_u64(hash);
+    
+    // Choose a banner style
+    let style = rng.gen_range(0..6);
+    
+    match style {
+        0 => generate_banner_gradient(&mut rng),
+        1 => generate_banner_waves(&mut rng),
+        2 => generate_banner_geometric(&mut rng),
+        3 => generate_banner_noise_gradient(&mut rng),
+        4 => generate_banner_stripes(&mut rng),
+        _ => generate_banner_abstract(&mut rng),
+    }
+}
+
+/// Gradient banner (horizontal, vertical, or diagonal)
+fn generate_banner_gradient<R: Rng>(rng: &mut R) -> RgbImage {
+    let mut img = ImageBuffer::new(BANNER_WIDTH, BANNER_HEIGHT);
+    
+    let color1 = random_saturated_color(rng);
+    let color2 = random_saturated_color(rng);
+    
+    let diagonal = rng.gen_bool(0.5);
+    
+    for (x, y, pixel) in img.enumerate_pixels_mut() {
+        let t = if diagonal {
+            ((x as f32 / BANNER_WIDTH as f32) + (y as f32 / BANNER_HEIGHT as f32)) / 2.0
+        } else {
+            x as f32 / BANNER_WIDTH as f32
+        };
+        
+        let color = lerp_color(color1, color2, t);
+        *pixel = Rgb(color);
+    }
+    
+    img
+}
+
+/// Wave pattern banner
+fn generate_banner_waves<R: Rng>(rng: &mut R) -> RgbImage {
+    let mut img = ImageBuffer::new(BANNER_WIDTH, BANNER_HEIGHT);
+    
+    let color1 = random_saturated_color(rng);
+    let color2 = random_saturated_color(rng);
+    let num_waves = rng.gen_range(3..8);
+    let amplitude = rng.gen_range(20.0..50.0);
+    let frequency = rng.gen_range(0.01..0.05);
+    
+    for (x, y, pixel) in img.enumerate_pixels_mut() {
+        let wave_y = (BANNER_HEIGHT as f32 / 2.0) + 
+            amplitude * ((x as f32 * frequency).sin() + (x as f32 * frequency * 2.0).sin() * 0.5);
+        
+        let dist_from_wave = (y as f32 - wave_y).abs();
+        let band = (dist_from_wave / (BANNER_HEIGHT as f32 / num_waves as f32)) as usize;
+        
+        let t = (band as f32 / num_waves as f32).min(1.0);
+        let color = lerp_color(color1, color2, t);
+        *pixel = Rgb(color);
+    }
+    
+    img
+}
+
+/// Geometric shapes banner
+fn generate_banner_geometric<R: Rng>(rng: &mut R) -> RgbImage {
+    let bg_color = random_light_color(rng);
+    let mut img = ImageBuffer::from_pixel(BANNER_WIDTH, BANNER_HEIGHT, Rgb(bg_color));
+    
+    let num_shapes = rng.gen_range(8..20);
+    
+    for _ in 0..num_shapes {
+        let shape = rng.gen_range(0..2);
+        let color = random_saturated_color(rng);
+        
+        match shape {
+            0 => {
+                // Circle
+                let cx = rng.gen_range(0..BANNER_WIDTH as i32);
+                let cy = rng.gen_range(0..BANNER_HEIGHT as i32);
+                let radius = rng.gen_range(20..80);
+                draw_circle(&mut img, cx, cy, radius, color, rng.gen_bool(0.6));
+            }
+            _ => {
+                // Rectangle
+                let x = rng.gen_range(0..BANNER_WIDTH);
+                let y = rng.gen_range(0..BANNER_HEIGHT);
+                let w = rng.gen_range(30..150);
+                let h = rng.gen_range(20..80);
+                draw_rect(&mut img, x, y, w, h, color);
+            }
+        }
+    }
+    
+    img
+}
+
+/// Noisy gradient banner
+fn generate_banner_noise_gradient<R: Rng>(rng: &mut R) -> RgbImage {
+    let mut img = ImageBuffer::new(BANNER_WIDTH, BANNER_HEIGHT);
+    
+    let color1 = random_saturated_color(rng);
+    let color2 = random_saturated_color(rng);
+    let noise_amount = rng.gen_range(10..40);
+    
+    for (x, _y, pixel) in img.enumerate_pixels_mut() {
+        let t = x as f32 / BANNER_WIDTH as f32;
+        let base_color = lerp_color(color1, color2, t);
+        
+        // Add noise
+        let noise_r = rng.gen_range(-(noise_amount as i32)..(noise_amount as i32));
+        let noise_g = rng.gen_range(-(noise_amount as i32)..(noise_amount as i32));
+        let noise_b = rng.gen_range(-(noise_amount as i32)..(noise_amount as i32));
+        
+        let color = [
+            (base_color[0] as i32 + noise_r).clamp(0, 255) as u8,
+            (base_color[1] as i32 + noise_g).clamp(0, 255) as u8,
+            (base_color[2] as i32 + noise_b).clamp(0, 255) as u8,
+        ];
+        
+        *pixel = Rgb(color);
+    }
+    
+    img
+}
+
+/// Striped banner
+fn generate_banner_stripes<R: Rng>(rng: &mut R) -> RgbImage {
+    let mut img = ImageBuffer::new(BANNER_WIDTH, BANNER_HEIGHT);
+    
+    let num_colors = rng.gen_range(2..5);
+    let colors: Vec<[u8; 3]> = (0..num_colors).map(|_| random_saturated_color(rng)).collect();
+    
+    let stripe_width = rng.gen_range(20..80);
+    let diagonal = rng.gen_bool(0.6);
+    
+    for (x, y, pixel) in img.enumerate_pixels_mut() {
+        let pos = if diagonal {
+            (x as i32 + y as i32) as u32
+        } else {
+            x
+        };
+        
+        let stripe_idx = (pos / stripe_width) as usize % colors.len();
+        *pixel = Rgb(colors[stripe_idx]);
+    }
+    
+    img
+}
+
+/// Abstract layered banner
+fn generate_banner_abstract<R: Rng>(rng: &mut R) -> RgbImage {
+    let bg_color = random_saturated_color(rng);
+    let mut img = ImageBuffer::from_pixel(BANNER_WIDTH, BANNER_HEIGHT, Rgb(bg_color));
+    
+    // Add overlapping semi-transparent layers
+    let num_layers = rng.gen_range(3..7);
+    
+    for _ in 0..num_layers {
+        let color = random_saturated_color(rng);
+        let layer_type = rng.gen_range(0..3);
+        
+        match layer_type {
+            0 => {
+                // Horizontal band
+                let y_start = rng.gen_range(0..BANNER_HEIGHT);
+                let height = rng.gen_range(30..100);
+                for y in y_start..((y_start + height).min(BANNER_HEIGHT)) {
+                    for x in 0..BANNER_WIDTH {
+                        let existing = img.get_pixel(x, y).0;
+                        let blended = lerp_color(existing, color, 0.5);
+                        img.put_pixel(x, y, Rgb(blended));
+                    }
+                }
+            }
+            1 => {
+                // Diagonal band
+                let offset = rng.gen_range(-(BANNER_WIDTH as i32 / 2)..(BANNER_WIDTH as i32));
+                let width = rng.gen_range(50..150);
+                for y in 0..BANNER_HEIGHT {
+                    for x in 0..BANNER_WIDTH {
+                        let diag = x as i32 - y as i32;
+                        if diag > offset && diag < offset + width as i32 {
+                            let existing = img.get_pixel(x, y).0;
+                            let blended = lerp_color(existing, color, 0.5);
+                            img.put_pixel(x, y, Rgb(blended));
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Large circle overlay
+                let cx = rng.gen_range(0..BANNER_WIDTH as i32);
+                let cy = rng.gen_range(0..BANNER_HEIGHT as i32);
+                let radius = rng.gen_range(50..150);
+                
+                for y in 0..BANNER_HEIGHT {
+                    for x in 0..BANNER_WIDTH {
+                        let dx = x as i32 - cx;
+                        let dy = y as i32 - cy;
+                        if dx * dx + dy * dy < radius * radius {
+                            let existing = img.get_pixel(x, y).0;
+                            let blended = lerp_color(existing, color, 0.4);
+                            img.put_pixel(x, y, Rgb(blended));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    img
 }
 
 fn simple_hash(s: &str) -> u64 {

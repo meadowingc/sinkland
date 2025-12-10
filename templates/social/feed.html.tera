@@ -260,7 +260,7 @@
     <article class="post-card">
         <div class="post-header">
             <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">
-                <img src="/social/avatar/{{ post.author.username }}.png" alt="" class="avatar">
+                <img src="/social/avatar/{{ post.author.username }}.png" alt="Avatar for {{ post.author.display_name }}" class="avatar">
             </a>
             <div class="user-info">
                 <a href="/social/user/{{ post.author.username }}" class="display-name" rel="nofollow noopener noreferrer">
@@ -280,7 +280,7 @@
         
         {% if post.has_image %}
         <a href="/social/post/{{ post.id }}" rel="nofollow noopener noreferrer">
-            <img src="/social/media/{{ post.image_id }}.png" alt="Post image" class="post-image">
+            <img src="/social/media/{{ post.image_id }}.png" alt="{{ post.image_alt | default(value='Post image') }}" class="post-image">
         </a>
         {% endif %}
         
@@ -306,7 +306,7 @@
         {% for user in suggested_users %}
         <div class="suggested-user">
             <a href="/social/user/{{ user.username }}" rel="nofollow noopener noreferrer">
-                <img src="/social/avatar/{{ user.username }}.png" alt="" class="avatar">
+                <img src="/social/avatar/{{ user.username }}.png" alt="Avatar for {{ user.display_name }}" class="avatar">
             </a>
             <div class="user-info">
                 <a href="/social/user/{{ user.username }}" class="display-name" rel="nofollow noopener noreferrer">

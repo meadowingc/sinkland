@@ -2,11 +2,12 @@ mod data;
 mod generators;
 
 use data::{BOOK_DATA, HAIKU_DATA};
-use generators::images::{generate_avatar_from_seed, generate_image_from_seed};
+use generators::images::{generate_avatar_from_seed, generate_banner_from_seed, generate_image_from_seed};
 use generators::social::{
     generate_comments_random, generate_feed_random, generate_post_random,
     generate_suggested_users_random, generate_trending_topics,
-    generate_user_random, generate_user_posts_random,
+    generate_user_likes_random, generate_user_media_posts_random,
+    generate_user_random, generate_user_posts_random, generate_user_replies_random,
 };
 
 use image::ImageFormat;
@@ -38,10 +39,13 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
     tera
 });
 
-// Atomic counters for visits
-static TRAP_VISITS: AtomicUsize = AtomicUsize::new(0);
-static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(0);
-static SOCIAL_VISITS: AtomicUsize = AtomicUsize::new(0);
+// Single unified visit counter for all pages
+static TOTAL_VISITS: AtomicUsize = AtomicUsize::new(0);
+
+/// Increment and get the total visit count
+fn increment_visits() -> usize {
+    TOTAL_VISITS.fetch_add(1, Ordering::Relaxed) + 1
+}
 
 // Helper function to generate random paragraphs
 fn generate_random_paragraphs(
@@ -271,7 +275,7 @@ fn generate_random_haiku() -> String {
 
 #[handler]
 fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
-    let visit_count = TRAP_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
+    let total_visits = increment_visits();
 
     let mut rng = rand::thread_rng();
 
@@ -292,7 +296,7 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
     context.insert("title", &title);
     context.insert("paragraphs", &paragraphs);
     context.insert("links", &links);
-    context.insert("visit_count", &visit_count);
+    context.insert("total_visits", &total_visits);
 
     TEMPLATES
         .render("book_random_sink.html.tera", &context)
@@ -302,6 +306,8 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
 
 #[handler]
 fn index() -> Result<Html<String>, poem::Error> {
+    let total_visits = increment_visits();
+
     let mut rng = rand::thread_rng();
 
     let num_paragraphs = rng.gen_range(1..=2);
@@ -318,6 +324,7 @@ fn index() -> Result<Html<String>, poem::Error> {
     context.insert("paragraphs", &paragraphs);
     context.insert("links", &links);
     context.insert("haiku_links", &haiku_links);
+    context.insert("total_visits", &total_visits);
 
     TEMPLATES
         .render("index_trap.html.tera", &context)
@@ -332,7 +339,7 @@ async fn robots_txt() -> &'static str {
 
 #[handler]
 fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
-    let visit_count = HAIKU_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
+    let total_visits = increment_visits();
 
     let mut rng = rand::thread_rng();
 
@@ -352,7 +359,7 @@ fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
     context.insert("title", &title);
     context.insert("haiku", &haiku);
     context.insert("links", &links);
-    context.insert("visit_count", &visit_count);
+    context.insert("total_visits", &total_visits);
 
     TEMPLATES
         .render("haiku_trap.html.tera", &context)
@@ -364,7 +371,7 @@ fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
 
 #[handler]
 fn social_feed() -> Result<Html<String>, poem::Error> {
-    let _visit_count = SOCIAL_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
+    let total_visits = increment_visits();
 
     // Generate fresh random content on every page visit
     let mut rng = rand::thread_rng();
@@ -376,6 +383,7 @@ fn social_feed() -> Result<Html<String>, poem::Error> {
     context.insert("posts", &posts);
     context.insert("trending", &trending);
     context.insert("suggested_users", &suggested_users);
+    context.insert("total_visits", &total_visits);
 
     TEMPLATES
         .render("social/feed.html.tera", &context)
@@ -385,6 +393,8 @@ fn social_feed() -> Result<Html<String>, poem::Error> {
 
 #[handler]
 fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poem::Error> {
+    let total_visits = increment_visits();
+
     // Generate fresh random content on every page visit
     let mut rng = rand::thread_rng();
     let user = generate_user_random(&mut rng, &username);
@@ -393,6 +403,8 @@ fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poe
     let mut context = Context::new();
     context.insert("user", &user);
     context.insert("posts", &posts);
+    context.insert("active_tab", "posts");
+    context.insert("total_visits", &total_visits);
 
     TEMPLATES
         .render("social/profile.html.tera", &context)
@@ -401,15 +413,42 @@ fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poe
 }
 
 #[handler]
-fn social_user_subpage(Path((username, _subpage)): Path<(String, String)>) -> Result<Html<String>, poem::Error> {
+fn social_user_subpage(Path((username, subpage)): Path<(String, String)>) -> Result<Html<String>, poem::Error> {
+    let total_visits = increment_visits();
+
     // Generate fresh random content on every page visit
     let mut rng = rand::thread_rng();
     let user = generate_user_random(&mut rng, &username);
-    let posts = generate_user_posts_random(&mut rng, &user, 10);
 
     let mut context = Context::new();
     context.insert("user", &user);
-    context.insert("posts", &posts);
+    context.insert("total_visits", &total_visits);
+
+    // Generate content based on the subpage/tab
+    match subpage.as_str() {
+        "replies" => {
+            let (posts, reply_targets) = generate_user_replies_random(&mut rng, &user, 10);
+            context.insert("posts", &posts);
+            context.insert("reply_targets", &reply_targets);
+            context.insert("active_tab", "replies");
+        }
+        "media" => {
+            let posts = generate_user_media_posts_random(&mut rng, &user, 10);
+            context.insert("posts", &posts);
+            context.insert("active_tab", "media");
+        }
+        "likes" => {
+            let posts = generate_user_likes_random(&mut rng, 10);
+            context.insert("posts", &posts);
+            context.insert("active_tab", "likes");
+        }
+        _ => {
+            // For followers, following, or any other subpage, show regular posts
+            let posts = generate_user_posts_random(&mut rng, &user, 10);
+            context.insert("posts", &posts);
+            context.insert("active_tab", "posts");
+        }
+    }
 
     TEMPLATES
         .render("social/profile.html.tera", &context)
@@ -419,16 +458,20 @@ fn social_user_subpage(Path((username, _subpage)): Path<(String, String)>) -> Re
 
 #[handler]
 fn social_post_page(Path(_post_id): Path<String>) -> Result<Html<String>, poem::Error> {
+    let total_visits = increment_visits();
+
     // Generate fresh random content on every page visit
     let mut rng = rand::thread_rng();
     let post = generate_post_random(&mut rng);
-    let comments = generate_comments_random(&mut rng, 8);
+    let num_comments = rng.gen_range(0..=8);
+    let comments = generate_comments_random(&mut rng, num_comments);
     let related_posts = generate_feed_random(&mut rng, 5);
 
     let mut context = Context::new();
     context.insert("post", &post);
     context.insert("comments", &comments);
     context.insert("related_posts", &related_posts);
+    context.insert("total_visits", &total_visits);
 
     TEMPLATES
         .render("social/post.html.tera", &context)
@@ -438,6 +481,8 @@ fn social_post_page(Path(_post_id): Path<String>) -> Result<Html<String>, poem::
 
 #[handler]
 fn social_search(Path(_query): Path<String>) -> Result<Html<String>, poem::Error> {
+    let total_visits = increment_visits();
+
     // Generate fresh random content on every page visit
     let mut rng = rand::thread_rng();
     let posts = generate_feed_random(&mut rng, 15);
@@ -448,6 +493,7 @@ fn social_search(Path(_query): Path<String>) -> Result<Html<String>, poem::Error
     context.insert("posts", &posts);
     context.insert("trending", &trending);
     context.insert("suggested_users", &suggested_users);
+    context.insert("total_visits", &total_visits);
 
     TEMPLATES
         .render("social/feed.html.tera", &context)
@@ -499,6 +545,27 @@ fn social_avatar(Path(username): Path<String>) -> Response {
         .body(buffer.into_inner())
 }
 
+#[handler]
+fn social_banner(Path(username): Path<String>) -> Response {
+    // Strip .png extension if present
+    let seed = username.trim_end_matches(".png");
+
+    let img = generate_banner_from_seed(seed);
+
+    let mut buffer = Cursor::new(Vec::new());
+    if img.write_to(&mut buffer, ImageFormat::Png).is_err() {
+        return Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body("Failed to generate banner");
+    }
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "image/png")
+        .header("Cache-Control", "public, max-age=86400")
+        .body(buffer.into_inner())
+}
+
 // ============ MAIN ============
 
 #[tokio::main]
@@ -516,7 +583,8 @@ async fn main() -> Result<(), std::io::Error> {
         .at("/social/post/:post_id", get(social_post_page))
         .at("/social/search/:query", get(social_search))
         .at("/social/media/:image_id", get(social_media_image))
-        .at("/social/avatar/:username", get(social_avatar));
+        .at("/social/avatar/:username", get(social_avatar))
+        .at("/social/banner/:username", get(social_banner));
 
     const PORT: u16 = 43796;
 

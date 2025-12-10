@@ -1,8 +1,6 @@
 use crate::data::{BOOK_DATA, HAIKU_DATA, NAME_DATA, SHORT_PHRASES};
 use rand::seq::SliceRandom;
 use rand::Rng;
-use rand::SeedableRng;
-use rand_chacha::ChaCha8Rng;
 use serde::Serialize;
 
 /// A social media user
@@ -26,6 +24,7 @@ pub struct Post {
     pub content: String,
     pub has_image: bool,
     pub image_id: Option<String>,
+    pub image_alt: Option<String>,
     pub likes: u32,
     pub reposts: u32,
     pub replies: u32,
@@ -42,50 +41,6 @@ pub struct Comment {
     pub likes: u32,
     pub timestamp: String,
     pub relative_time: String,
-}
-
-fn simple_hash(s: &str) -> u64 {
-    let mut hash: u64 = 5381;
-    for byte in s.bytes() {
-        hash = hash.wrapping_mul(33).wrapping_add(byte as u64);
-    }
-    hash
-}
-
-/// Generate a deterministic user from a username
-pub fn generate_user(username: &str) -> User {
-    let hash = simple_hash(username);
-    let mut rng = ChaCha8Rng::seed_from_u64(hash);
-
-    // Generate display name
-    let display_name = generate_display_name(&mut rng);
-
-    // Generate bio
-    let bio = generate_bio(&mut rng);
-
-    // Generate stats
-    let followers = generate_follower_count(&mut rng);
-    let following = rng.gen_range(50..2000);
-    let post_count = rng.gen_range(10..5000);
-
-    // Generate join date
-    let year = rng.gen_range(2008..2024);
-    let month = rng.gen_range(1..=12);
-    let join_date = format!("{} {}", month_name(month), year);
-
-    // Small chance of being verified
-    let verified = rng.gen_bool(0.05);
-
-    User {
-        username: username.to_string(),
-        display_name,
-        bio,
-        followers,
-        following,
-        post_count,
-        join_date,
-        verified,
-    }
 }
 
 /// Generate a random username
@@ -142,11 +97,7 @@ fn generate_display_name<R: Rng>(rng: &mut R) -> String {
             // Adjective + Noun
             let adj = NAME_DATA.adjectives.choose(rng).unwrap_or(&"Mysterious");
             let noun = NAME_DATA.nouns.choose(rng).unwrap_or(&"Traveler");
-            format!(
-                "{} {}",
-                capitalize(adj),
-                capitalize(noun)
-            )
+            format!("{} {}", capitalize(adj), capitalize(noun))
         }
         2 => {
             // Name + emoji-like suffix
@@ -170,10 +121,7 @@ fn generate_bio<R: Rng>(rng: &mut R) -> String {
     match style {
         0 => {
             // Short phrase
-            SHORT_PHRASES
-                .choose(rng)
-                .unwrap_or(&"existing")
-                .to_string()
+            SHORT_PHRASES.choose(rng).unwrap_or(&"existing").to_string()
         }
         1 => {
             // Noun enthusiast
@@ -228,70 +176,20 @@ fn generate_follower_count<R: Rng>(rng: &mut R) -> u32 {
     }
 }
 
-/// Generate a post with a given ID
-pub fn generate_post(post_id: &str) -> Post {
-    let hash = simple_hash(post_id);
-    let mut rng = ChaCha8Rng::seed_from_u64(hash);
-
-    // Generate author
-    let username = generate_username(&mut rng);
-    let author = generate_user(&username);
-
-    // Generate content
-    let content = generate_post_content(&mut rng);
-
-    // Decide if this post has an image (30% chance)
-    let has_image = rng.gen_bool(0.3);
-    let image_id = if has_image {
-        Some(format!("img_{}", post_id))
-    } else {
-        None
-    };
-
-    // Generate engagement stats
-    let base_engagement = if author.followers > 10000 {
-        rng.gen_range(100..5000)
-    } else if author.followers > 1000 {
-        rng.gen_range(10..500)
-    } else {
-        rng.gen_range(0..50)
-    };
-
-    let likes = base_engagement + rng.gen_range(0..100);
-    let reposts = base_engagement / 5 + rng.gen_range(0..20);
-    let replies = base_engagement / 10 + rng.gen_range(0..30);
-
-    // Generate timestamp
-    let (timestamp, relative_time) = generate_timestamp(&mut rng);
-
-    Post {
-        id: post_id.to_string(),
-        author,
-        content,
-        has_image,
-        image_id,
-        likes,
-        reposts,
-        replies,
-        timestamp,
-        relative_time,
-    }
-}
-
 fn generate_post_content<R: Rng>(rng: &mut R) -> String {
     let style = rng.gen_range(0..6);
 
     match style {
         0 => {
             // Short phrase
-            SHORT_PHRASES
-                .choose(rng)
-                .unwrap_or(&"vibing")
-                .to_string()
+            SHORT_PHRASES.choose(rng).unwrap_or(&"vibing").to_string()
         }
         1 => {
             // Haiku-style
-            let line = HAIKU_DATA.lines_7.choose(rng).or_else(|| HAIKU_DATA.lines_5.choose(rng));
+            let line = HAIKU_DATA
+                .lines_7
+                .choose(rng)
+                .or_else(|| HAIKU_DATA.lines_5.choose(rng));
             line.map(|s| s.to_string())
                 .unwrap_or_else(|| "thinking about stuff".to_string())
         }
@@ -315,7 +213,10 @@ fn generate_post_content<R: Rng>(rng: &mut R) -> String {
             let nouns = &NAME_DATA.nouns;
             let noun = nouns.choose(rng).unwrap_or(&"life");
             let questions = [
-                format!("does anyone else think about {} at 3am or is it just me", noun),
+                format!(
+                    "does anyone else think about {} at 3am or is it just me",
+                    noun
+                ),
                 format!("hot take: {} is overrated", noun),
                 format!("unpopular opinion: we don't talk about {} enough", noun),
                 format!("genuinely curious - what's everyone's take on {}?", noun),
@@ -352,10 +253,7 @@ fn generate_post_content<R: Rng>(rng: &mut R) -> String {
                 "this is peak",
                 "no thoughts head empty",
             ];
-            captions
-                .choose(rng)
-                .unwrap_or(&"✨")
-                .to_string()
+            captions.choose(rng).unwrap_or(&"✨").to_string()
         }
     }
 }
@@ -386,33 +284,6 @@ fn generate_timestamp<R: Rng>(rng: &mut R) -> (String, String) {
     (timestamp, relative)
 }
 
-/// Generate comments for a post
-pub fn generate_comments(post_id: &str, count: usize) -> Vec<Comment> {
-    let base_hash = simple_hash(post_id);
-
-    (0..count)
-        .map(|i| {
-            let comment_seed = base_hash.wrapping_add(i as u64 * 12345);
-            let mut rng = ChaCha8Rng::seed_from_u64(comment_seed);
-
-            let username = generate_username(&mut rng);
-            let author = generate_user(&username);
-            let content = generate_comment_content(&mut rng);
-            let likes = rng.gen_range(0..100);
-            let (timestamp, relative_time) = generate_timestamp(&mut rng);
-
-            Comment {
-                id: format!("{}_{}", post_id, i),
-                author,
-                content,
-                likes,
-                timestamp,
-                relative_time,
-            }
-        })
-        .collect()
-}
-
 fn generate_comment_content<R: Rng>(rng: &mut R) -> String {
     let style = rng.gen_range(0..8);
 
@@ -424,12 +295,7 @@ fn generate_comment_content<R: Rng>(rng: &mut R) -> String {
             let reactions = ["💀", "😭", "🔥", "✨", "👀", "🙏", "💯", "😍"];
             reactions.choose(rng).unwrap_or(&"👍").to_string()
         }
-        4 => {
-            SHORT_PHRASES
-                .choose(rng)
-                .unwrap_or(&"mood")
-                .to_string()
-        }
+        4 => SHORT_PHRASES.choose(rng).unwrap_or(&"mood").to_string(),
         5 => "wait this is actually so real".to_string(),
         6 => "adding this to my saved posts".to_string(),
         _ => {
@@ -449,23 +315,97 @@ fn generate_comment_content<R: Rng>(rng: &mut R) -> String {
     }
 }
 
-/// Generate a feed of posts (seeded version for deterministic results)
-pub fn generate_feed(seed: &str, count: usize) -> Vec<Post> {
-    let hash = simple_hash(seed);
-
-    (0..count)
-        .map(|i| {
-            let post_id = format!("{:x}{:x}", hash.wrapping_add(i as u64), hash.wrapping_mul(i as u64 + 1));
-            generate_post(&post_id)
-        })
-        .collect()
-}
-
 /// Generate a feed of posts (random version - fresh content every time)
 pub fn generate_feed_random<R: Rng>(rng: &mut R, count: usize) -> Vec<Post> {
-    (0..count)
-        .map(|_| generate_post_random(rng))
-        .collect()
+    (0..count).map(|_| generate_post_random(rng)).collect()
+}
+
+/// Generate a fictitious image caption/alt text
+fn generate_image_alt<R: Rng>(rng: &mut R) -> String {
+    let style = rng.gen_range(0..8);
+
+    match style {
+        0 => {
+            // Scenic description
+            let scenes = [
+                "sunset over the mountains",
+                "misty morning by the lake",
+                "autumn leaves on a quiet path",
+                "city skyline at dusk",
+                "waves crashing on rocks",
+                "a cozy café corner",
+                "rain on a window pane",
+                "stars above the desert",
+                "cherry blossoms in spring",
+                "snow-covered forest trail",
+            ];
+            scenes.choose(rng).unwrap_or(&"peaceful scenery").to_string()
+        }
+        1 => {
+            // Abstract/artistic
+            let adj = NAME_DATA.adjectives.choose(rng).unwrap_or(&"abstract");
+            let nouns = ["shapes", "patterns", "colors", "forms", "lines", "textures"];
+            let noun = nouns.choose(rng).unwrap_or(&"composition");
+            format!("{} {} in motion", adj, noun)
+        }
+        2 => {
+            // Food
+            let foods = [
+                "homemade pasta with fresh basil",
+                "morning coffee and croissant",
+                "colorful summer salad",
+                "decadent chocolate cake",
+                "steaming bowl of ramen",
+                "fresh fruit arrangement",
+                "artisan bread loaf",
+                "sushi platter",
+            ];
+            foods.choose(rng).unwrap_or(&"delicious meal").to_string()
+        }
+        3 => {
+            // Pet/animal
+            let animals = [
+                "sleepy cat on a sunlit windowsill",
+                "dog playing in the park",
+                "bird perched on a branch",
+                "curious squirrel in the garden",
+                "butterflies on wildflowers",
+                "fish in a clear stream",
+            ];
+            animals.choose(rng).unwrap_or(&"cute animal").to_string()
+        }
+        4 => {
+            // Art/creative
+            let mediums = ["watercolor", "digital art", "photograph", "sketch", "painting", "collage"];
+            let medium = mediums.choose(rng).unwrap_or(&"artwork");
+            let noun = NAME_DATA.nouns.choose(rng).unwrap_or(&"dreams");
+            format!("{} of {}", medium, noun)
+        }
+        5 => {
+            // Meme/casual
+            let memes = [
+                "no context needed",
+                "when you see it",
+                "this is fine",
+                "perfectly captured moment",
+                "accidental renaissance",
+                "blurry but meaningful",
+                "screenshot evidence",
+            ];
+            memes.choose(rng).unwrap_or(&"random image").to_string()
+        }
+        6 => {
+            // Book/quote related
+            let noun = NAME_DATA.nouns.choose(rng).unwrap_or(&"wisdom");
+            format!("quote about {} on vintage paper", noun)
+        }
+        _ => {
+            // Generic descriptive
+            let adj = NAME_DATA.adjectives.choose(rng).unwrap_or(&"beautiful");
+            let noun = NAME_DATA.nouns.choose(rng).unwrap_or(&"moment");
+            format!("{} {} captured", adj, noun)
+        }
+    }
 }
 
 /// Generate a random post (not seeded - fresh content)
@@ -480,10 +420,10 @@ pub fn generate_post_random<R: Rng>(rng: &mut R) -> Post {
     // Decide if this post has an image (30% chance)
     let has_image = rng.gen_bool(0.3);
     let random_id: u64 = rng.gen_range(0..u64::MAX);
-    let image_id = if has_image {
-        Some(format!("img_{:x}", random_id))
+    let (image_id, image_alt) = if has_image {
+        (Some(format!("img_{:x}", random_id)), Some(generate_image_alt(rng)))
     } else {
-        None
+        (None, None)
     };
 
     // Generate engagement stats
@@ -512,6 +452,7 @@ pub fn generate_post_random<R: Rng>(rng: &mut R) -> Post {
         content,
         has_image,
         image_id,
+        image_alt,
         likes,
         reposts,
         replies,
@@ -557,31 +498,52 @@ pub fn generate_user_posts_random<R: Rng>(rng: &mut R, user: &User, count: usize
         .collect()
 }
 
-/// Generate posts for a user's profile
-pub fn generate_user_posts(username: &str, count: usize) -> Vec<Post> {
-    let hash = simple_hash(username);
-    let user = generate_user(username);
+/// Generate replies by a user (posts shown as replies to other users)
+pub fn generate_user_replies_random<R: Rng>(
+    rng: &mut R,
+    user: &User,
+    count: usize,
+) -> (Vec<Post>, Vec<User>) {
+    let mut posts = Vec::with_capacity(count);
+    let mut reply_targets = Vec::with_capacity(count);
 
-    (0..count)
-        .map(|i| {
-            let post_id = format!("{}_{:x}", username, hash.wrapping_add(i as u64 * 999));
-            let mut post = generate_post(&post_id);
-            // Override author with the user
-            post.author = user.clone();
-            post
-        })
-        .collect()
+    for _ in 0..count {
+        let mut post = generate_post_random(rng);
+        post.author = user.clone();
+
+        // Generate a random user this is replying to
+        let target_username = generate_username(rng);
+        let target_user = generate_user_random(rng, &target_username);
+        reply_targets.push(target_user);
+
+        posts.push(post);
+    }
+
+    (posts, reply_targets)
 }
 
-/// Generate suggested users to follow (seeded version)
-pub fn generate_suggested_users(seed: &str, count: usize) -> Vec<User> {
-    let hash = simple_hash(seed);
-    let mut rng = ChaCha8Rng::seed_from_u64(hash);
+/// Generate liked posts (posts by other users that this user has liked)
+pub fn generate_user_likes_random<R: Rng>(rng: &mut R, count: usize) -> Vec<Post> {
+    // Just generate random posts by other users
+    generate_feed_random(rng, count)
+}
 
+/// Generate media-only posts for a user (posts with images)
+pub fn generate_user_media_posts_random<R: Rng>(rng: &mut R, user: &User, count: usize) -> Vec<Post> {
     (0..count)
         .map(|_| {
-            let username = generate_username(&mut rng);
-            generate_user(&username)
+            let mut post = generate_post_random(rng);
+            post.author = user.clone();
+            // Force this post to have an image
+            post.has_image = true;
+            if post.image_id.is_none() {
+                let random_id: u64 = rng.gen_range(0..u64::MAX);
+                post.image_id = Some(format!("img_{:x}", random_id));
+            }
+            if post.image_alt.is_none() {
+                post.image_alt = Some(generate_image_alt(rng));
+            }
+            post
         })
         .collect()
 }

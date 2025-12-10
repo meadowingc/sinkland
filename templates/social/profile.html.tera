@@ -9,9 +9,15 @@
 }
 
 .profile-header {
-    background: linear-gradient(135deg, #1da1f2 0%, #0d8ecf 100%);
     height: 150px;
     border-radius: 12px 12px 0 0;
+    overflow: hidden;
+}
+
+.profile-banner {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .profile-info {
@@ -287,14 +293,12 @@
 <div class="profile-container">
     <a href="/social" class="back-link" rel="nofollow noopener noreferrer">← Back to feed</a>
     
-    <div class="note-box">
-        <strong>Note:</strong> This is a procedurally generated profile. This user does not exist.
+    <div class="profile-header">
+        <img src="/social/banner/{{ user.username }}.png" alt="Profile banner for {{ user.display_name }}" class="profile-banner">
     </div>
     
-    <div class="profile-header"></div>
-    
     <div class="profile-info">
-        <img src="/social/avatar/{{ user.username }}.png" alt="" class="profile-avatar">
+        <img src="/social/avatar/{{ user.username }}.png" alt="Avatar for {{ user.display_name }}" class="profile-avatar">
         
         <div class="profile-actions">
             <button class="follow-btn">Follow</button>
@@ -328,17 +332,37 @@
     </div>
     
     <div class="profile-tabs">
-        <a href="/social/user/{{ user.username }}" class="tab active" rel="nofollow noopener noreferrer">Posts</a>
-        <a href="/social/user/{{ user.username }}/replies" class="tab" rel="nofollow noopener noreferrer">Replies</a>
-        <a href="/social/user/{{ user.username }}/media" class="tab" rel="nofollow noopener noreferrer">Media</a>
-        <a href="/social/user/{{ user.username }}/likes" class="tab" rel="nofollow noopener noreferrer">Likes</a>
+        <a href="/social/user/{{ user.username }}" class="tab {% if active_tab == "posts" or not active_tab %}active{% endif %}" rel="nofollow noopener noreferrer">Posts</a>
+        <a href="/social/user/{{ user.username }}/replies" class="tab {% if active_tab == "replies" %}active{% endif %}" rel="nofollow noopener noreferrer">Replies</a>
+        <a href="/social/user/{{ user.username }}/media" class="tab {% if active_tab == "media" %}active{% endif %}" rel="nofollow noopener noreferrer">Media</a>
+        <a href="/social/user/{{ user.username }}/likes" class="tab {% if active_tab == "likes" %}active{% endif %}" rel="nofollow noopener noreferrer">Likes</a>
     </div>
+    
+    {% if active_tab == "replies" %}
+    <div class="tab-description" style="color: #657786; font-size: 0.9em; margin-bottom: 15px;">
+        Replies by @{{ user.username }} to other users
+    </div>
+    {% elif active_tab == "likes" %}
+    <div class="tab-description" style="color: #657786; font-size: 0.9em; margin-bottom: 15px;">
+        Posts liked by @{{ user.username }}
+    </div>
+    {% elif active_tab == "media" %}
+    <div class="tab-description" style="color: #657786; font-size: 0.9em; margin-bottom: 15px;">
+        Media posts by @{{ user.username }}
+    </div>
+    {% endif %}
     
     {% for post in posts %}
     <article class="post-card">
+        {% if active_tab == "replies" and reply_targets[loop.index0] %}
+        <div class="reply-context" style="color: #657786; font-size: 0.85em; margin-bottom: 10px; padding-left: 60px;">
+            Replying to <a href="/social/user/{{ reply_targets[loop.index0].username }}" style="color: #1da1f2;" rel="nofollow noopener noreferrer">@{{ reply_targets[loop.index0].username }}</a>
+        </div>
+        {% endif %}
+        
         <div class="post-header">
             <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">
-                <img src="/social/avatar/{{ post.author.username }}.png" alt="" class="avatar">
+                <img src="/social/avatar/{{ post.author.username }}.png" alt="Avatar for {{ post.author.display_name }}" class="avatar">
             </a>
             <div class="user-info">
                 <a href="/social/user/{{ post.author.username }}" class="display-name" rel="nofollow noopener noreferrer">
@@ -358,7 +382,7 @@
         
         {% if post.has_image %}
         <a href="/social/post/{{ post.id }}" rel="nofollow noopener noreferrer">
-            <img src="/social/media/{{ post.image_id }}.png" alt="Post image" class="post-image">
+            <img src="/social/media/{{ post.image_id }}.png" alt="{{ post.image_alt | default(value='Post image') }}" class="post-image">
         </a>
         {% endif %}
         
