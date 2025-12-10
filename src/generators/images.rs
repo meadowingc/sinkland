@@ -15,10 +15,10 @@ pub fn generate_image_from_seed(seed: &str) -> RgbImage {
     // Create a deterministic seed from the string
     let hash = simple_hash(seed);
     let mut rng = ChaCha8Rng::seed_from_u64(hash);
-    
+
     // Choose a generator based on the seed
     let generator_choice = rng.gen_range(0..8);
-    
+
     match generator_choice {
         0 => generate_noise(&mut rng),
         1 => generate_geometric_circles(&mut rng),
@@ -36,7 +36,7 @@ pub fn generate_image_from_seed(seed: &str) -> RgbImage {
 pub fn generate_avatar_from_seed(seed: &str) -> RgbImage {
     let hash = simple_hash(seed);
     let mut rng = ChaCha8Rng::seed_from_u64(hash);
-    
+
     // Avatars use a symmetric pattern for a more "icon-like" feel
     generate_symmetric_avatar(&mut rng)
 }
@@ -45,10 +45,10 @@ pub fn generate_avatar_from_seed(seed: &str) -> RgbImage {
 pub fn generate_banner_from_seed(seed: &str) -> RgbImage {
     let hash = simple_hash(seed);
     let mut rng = ChaCha8Rng::seed_from_u64(hash);
-    
+
     // Choose a banner style
     let style = rng.gen_range(0..6);
-    
+
     match style {
         0 => generate_banner_gradient(&mut rng),
         1 => generate_banner_waves(&mut rng),
@@ -62,48 +62,48 @@ pub fn generate_banner_from_seed(seed: &str) -> RgbImage {
 /// Gradient banner (horizontal, vertical, or diagonal)
 fn generate_banner_gradient<R: Rng>(rng: &mut R) -> RgbImage {
     let mut img = ImageBuffer::new(BANNER_WIDTH, BANNER_HEIGHT);
-    
+
     let color1 = random_saturated_color(rng);
     let color2 = random_saturated_color(rng);
-    
+
     let diagonal = rng.gen_bool(0.5);
-    
+
     for (x, y, pixel) in img.enumerate_pixels_mut() {
         let t = if diagonal {
             ((x as f32 / BANNER_WIDTH as f32) + (y as f32 / BANNER_HEIGHT as f32)) / 2.0
         } else {
             x as f32 / BANNER_WIDTH as f32
         };
-        
+
         let color = lerp_color(color1, color2, t);
         *pixel = Rgb(color);
     }
-    
+
     img
 }
 
 /// Wave pattern banner
 fn generate_banner_waves<R: Rng>(rng: &mut R) -> RgbImage {
     let mut img = ImageBuffer::new(BANNER_WIDTH, BANNER_HEIGHT);
-    
+
     let color1 = random_saturated_color(rng);
     let color2 = random_saturated_color(rng);
     let num_waves = rng.gen_range(3..8);
     let amplitude = rng.gen_range(20.0..50.0);
     let frequency = rng.gen_range(0.01..0.05);
-    
+
     for (x, y, pixel) in img.enumerate_pixels_mut() {
-        let wave_y = (BANNER_HEIGHT as f32 / 2.0) + 
-            amplitude * ((x as f32 * frequency).sin() + (x as f32 * frequency * 2.0).sin() * 0.5);
-        
+        let wave_y = (BANNER_HEIGHT as f32 / 2.0)
+            + amplitude * ((x as f32 * frequency).sin() + (x as f32 * frequency * 2.0).sin() * 0.5);
+
         let dist_from_wave = (y as f32 - wave_y).abs();
         let band = (dist_from_wave / (BANNER_HEIGHT as f32 / num_waves as f32)) as usize;
-        
+
         let t = (band as f32 / num_waves as f32).min(1.0);
         let color = lerp_color(color1, color2, t);
         *pixel = Rgb(color);
     }
-    
+
     img
 }
 
@@ -111,13 +111,13 @@ fn generate_banner_waves<R: Rng>(rng: &mut R) -> RgbImage {
 fn generate_banner_geometric<R: Rng>(rng: &mut R) -> RgbImage {
     let bg_color = random_light_color(rng);
     let mut img = ImageBuffer::from_pixel(BANNER_WIDTH, BANNER_HEIGHT, Rgb(bg_color));
-    
+
     let num_shapes = rng.gen_range(8..20);
-    
+
     for _ in 0..num_shapes {
         let shape = rng.gen_range(0..2);
         let color = random_saturated_color(rng);
-        
+
         match shape {
             0 => {
                 // Circle
@@ -136,60 +136,62 @@ fn generate_banner_geometric<R: Rng>(rng: &mut R) -> RgbImage {
             }
         }
     }
-    
+
     img
 }
 
 /// Noisy gradient banner
 fn generate_banner_noise_gradient<R: Rng>(rng: &mut R) -> RgbImage {
     let mut img = ImageBuffer::new(BANNER_WIDTH, BANNER_HEIGHT);
-    
+
     let color1 = random_saturated_color(rng);
     let color2 = random_saturated_color(rng);
     let noise_amount = rng.gen_range(10..40);
-    
+
     for (x, _y, pixel) in img.enumerate_pixels_mut() {
         let t = x as f32 / BANNER_WIDTH as f32;
         let base_color = lerp_color(color1, color2, t);
-        
+
         // Add noise
         let noise_r = rng.gen_range(-(noise_amount as i32)..(noise_amount as i32));
         let noise_g = rng.gen_range(-(noise_amount as i32)..(noise_amount as i32));
         let noise_b = rng.gen_range(-(noise_amount as i32)..(noise_amount as i32));
-        
+
         let color = [
             (base_color[0] as i32 + noise_r).clamp(0, 255) as u8,
             (base_color[1] as i32 + noise_g).clamp(0, 255) as u8,
             (base_color[2] as i32 + noise_b).clamp(0, 255) as u8,
         ];
-        
+
         *pixel = Rgb(color);
     }
-    
+
     img
 }
 
 /// Striped banner
 fn generate_banner_stripes<R: Rng>(rng: &mut R) -> RgbImage {
     let mut img = ImageBuffer::new(BANNER_WIDTH, BANNER_HEIGHT);
-    
+
     let num_colors = rng.gen_range(2..5);
-    let colors: Vec<[u8; 3]> = (0..num_colors).map(|_| random_saturated_color(rng)).collect();
-    
+    let colors: Vec<[u8; 3]> = (0..num_colors)
+        .map(|_| random_saturated_color(rng))
+        .collect();
+
     let stripe_width = rng.gen_range(20..80);
     let diagonal = rng.gen_bool(0.6);
-    
+
     for (x, y, pixel) in img.enumerate_pixels_mut() {
         let pos = if diagonal {
             (x as i32 + y as i32) as u32
         } else {
             x
         };
-        
+
         let stripe_idx = (pos / stripe_width) as usize % colors.len();
         *pixel = Rgb(colors[stripe_idx]);
     }
-    
+
     img
 }
 
@@ -197,14 +199,14 @@ fn generate_banner_stripes<R: Rng>(rng: &mut R) -> RgbImage {
 fn generate_banner_abstract<R: Rng>(rng: &mut R) -> RgbImage {
     let bg_color = random_saturated_color(rng);
     let mut img = ImageBuffer::from_pixel(BANNER_WIDTH, BANNER_HEIGHT, Rgb(bg_color));
-    
+
     // Add overlapping semi-transparent layers
     let num_layers = rng.gen_range(3..7);
-    
+
     for _ in 0..num_layers {
         let color = random_saturated_color(rng);
         let layer_type = rng.gen_range(0..3);
-        
+
         match layer_type {
             0 => {
                 // Horizontal band
@@ -238,7 +240,7 @@ fn generate_banner_abstract<R: Rng>(rng: &mut R) -> RgbImage {
                 let cx = rng.gen_range(0..BANNER_WIDTH as i32);
                 let cy = rng.gen_range(0..BANNER_HEIGHT as i32);
                 let radius = rng.gen_range(50..150);
-                
+
                 for y in 0..BANNER_HEIGHT {
                     for x in 0..BANNER_WIDTH {
                         let dx = x as i32 - cx;
@@ -253,7 +255,7 @@ fn generate_banner_abstract<R: Rng>(rng: &mut R) -> RgbImage {
             }
         }
     }
-    
+
     img
 }
 
@@ -296,19 +298,19 @@ fn generate_noise<R: Rng>(rng: &mut R) -> RgbImage {
 fn generate_geometric_circles<R: Rng>(rng: &mut R) -> RgbImage {
     let bg_color = random_color(rng);
     let mut img = ImageBuffer::from_pixel(IMAGE_WIDTH, IMAGE_HEIGHT, Rgb(bg_color));
-    
+
     let num_circles = rng.gen_range(5..20);
-    
+
     for _ in 0..num_circles {
         let cx = rng.gen_range(0..IMAGE_WIDTH as i32);
         let cy = rng.gen_range(0..IMAGE_HEIGHT as i32);
         let radius = rng.gen_range(20..100);
         let color = random_color(rng);
         let filled = rng.gen_bool(0.7);
-        
+
         draw_circle(&mut img, cx, cy, radius, color, filled);
     }
-    
+
     img
 }
 
@@ -316,33 +318,33 @@ fn generate_geometric_circles<R: Rng>(rng: &mut R) -> RgbImage {
 fn generate_geometric_rectangles<R: Rng>(rng: &mut R) -> RgbImage {
     let bg_color = random_color(rng);
     let mut img = ImageBuffer::from_pixel(IMAGE_WIDTH, IMAGE_HEIGHT, Rgb(bg_color));
-    
+
     let num_rects = rng.gen_range(5..15);
-    
+
     for _ in 0..num_rects {
         let x = rng.gen_range(0..IMAGE_WIDTH);
         let y = rng.gen_range(0..IMAGE_HEIGHT);
         let w = rng.gen_range(30..150);
         let h = rng.gen_range(30..150);
         let color = random_color(rng);
-        
+
         draw_rect(&mut img, x, y, w, h, color);
     }
-    
+
     img
 }
 
 /// Multi-stop gradient
 fn generate_gradient<R: Rng>(rng: &mut R) -> RgbImage {
     let mut img = ImageBuffer::new(IMAGE_WIDTH, IMAGE_HEIGHT);
-    
+
     let color1 = random_color(rng);
     let color2 = random_color(rng);
     let color3 = random_color(rng);
-    
+
     let horizontal = rng.gen_bool(0.5);
     let diagonal = rng.gen_bool(0.3);
-    
+
     for (x, y, pixel) in img.enumerate_pixels_mut() {
         let t = if diagonal {
             ((x as f32 / IMAGE_WIDTH as f32) + (y as f32 / IMAGE_HEIGHT as f32)) / 2.0
@@ -351,7 +353,7 @@ fn generate_gradient<R: Rng>(rng: &mut R) -> RgbImage {
         } else {
             y as f32 / IMAGE_HEIGHT as f32
         };
-        
+
         // Three-color gradient
         let color = if t < 0.5 {
             let t2 = t * 2.0;
@@ -360,17 +362,17 @@ fn generate_gradient<R: Rng>(rng: &mut R) -> RgbImage {
             let t2 = (t - 0.5) * 2.0;
             lerp_color(color2, color3, t2)
         };
-        
+
         *pixel = Rgb(color);
     }
-    
+
     img
 }
 
 /// Mondrian-style grid
 fn generate_mondrian<R: Rng>(rng: &mut R) -> RgbImage {
     let mut img = ImageBuffer::from_pixel(IMAGE_WIDTH, IMAGE_HEIGHT, Rgb([255, 255, 255]));
-    
+
     // Mondrian colors: red, blue, yellow, white, black
     let colors = [
         [255, 255, 255], // white
@@ -379,7 +381,7 @@ fn generate_mondrian<R: Rng>(rng: &mut R) -> RgbImage {
         [255, 255, 0],   // yellow
         [0, 0, 0],       // black (rare)
     ];
-    
+
     // Generate grid divisions
     let mut x_divs: Vec<u32> = vec![0];
     let mut x = 0;
@@ -390,7 +392,7 @@ fn generate_mondrian<R: Rng>(rng: &mut R) -> RgbImage {
         }
     }
     x_divs.push(IMAGE_WIDTH);
-    
+
     let mut y_divs: Vec<u32> = vec![0];
     let mut y = 0;
     while y < IMAGE_HEIGHT {
@@ -400,13 +402,17 @@ fn generate_mondrian<R: Rng>(rng: &mut R) -> RgbImage {
         }
     }
     y_divs.push(IMAGE_HEIGHT);
-    
+
     // Fill rectangles
     for i in 0..x_divs.len() - 1 {
         for j in 0..y_divs.len() - 1 {
-            let color_idx = if rng.gen_bool(0.6) { 0 } else { rng.gen_range(0..colors.len()) };
+            let color_idx = if rng.gen_bool(0.6) {
+                0
+            } else {
+                rng.gen_range(0..colors.len())
+            };
             let color = colors[color_idx];
-            
+
             draw_rect(
                 &mut img,
                 x_divs[i],
@@ -417,7 +423,7 @@ fn generate_mondrian<R: Rng>(rng: &mut R) -> RgbImage {
             );
         }
     }
-    
+
     // Draw black grid lines
     let line_width = 4;
     for &x in &x_divs[1..x_divs.len() - 1] {
@@ -438,44 +444,44 @@ fn generate_mondrian<R: Rng>(rng: &mut R) -> RgbImage {
             }
         }
     }
-    
+
     img
 }
 
 /// Wave interference pattern
 fn generate_wave_interference<R: Rng>(rng: &mut R) -> RgbImage {
     let mut img = ImageBuffer::new(IMAGE_WIDTH, IMAGE_HEIGHT);
-    
+
     let num_waves = rng.gen_range(2..5);
     let mut wave_params: Vec<(f32, f32, f32, f32)> = Vec::new();
-    
+
     for _ in 0..num_waves {
         wave_params.push((
-            rng.gen_range(0.0..IMAGE_WIDTH as f32),   // center x
-            rng.gen_range(0.0..IMAGE_HEIGHT as f32),  // center y
-            rng.gen_range(0.02..0.1),                 // frequency
+            rng.gen_range(0.0..IMAGE_WIDTH as f32),    // center x
+            rng.gen_range(0.0..IMAGE_HEIGHT as f32),   // center y
+            rng.gen_range(0.02..0.1),                  // frequency
             rng.gen_range(0.0..std::f32::consts::TAU), // phase
         ));
     }
-    
+
     let color1 = random_color(rng);
     let color2 = random_color(rng);
-    
+
     for (x, y, pixel) in img.enumerate_pixels_mut() {
         let mut sum = 0.0;
-        
+
         for (cx, cy, freq, phase) in &wave_params {
             let dx = x as f32 - cx;
             let dy = y as f32 - cy;
             let dist = (dx * dx + dy * dy).sqrt();
             sum += (dist * freq + phase).sin();
         }
-        
+
         let t = (sum / num_waves as f32 + 1.0) / 2.0;
         let color = lerp_color(color1, color2, t);
         *pixel = Rgb(color);
     }
-    
+
     img
 }
 
@@ -484,14 +490,14 @@ fn generate_pixel_pattern<R: Rng>(rng: &mut R) -> RgbImage {
     let bg_color = random_light_color(rng);
     let fg_color = random_color(rng);
     let mut img = ImageBuffer::from_pixel(IMAGE_WIDTH, IMAGE_HEIGHT, Rgb(bg_color));
-    
+
     let block_size = rng.gen_range(15..40);
     let cols = (IMAGE_WIDTH / block_size) as usize;
     let rows = (IMAGE_HEIGHT / block_size) as usize;
-    
+
     // Generate half the pattern, then mirror
     let half_cols = (cols + 1) / 2;
-    
+
     for row in 0..rows {
         for col in 0..half_cols {
             if rng.gen_bool(0.5) {
@@ -499,7 +505,7 @@ fn generate_pixel_pattern<R: Rng>(rng: &mut R) -> RgbImage {
                 let x = col as u32 * block_size;
                 let y = row as u32 * block_size;
                 draw_rect(&mut img, x, y, block_size, block_size, fg_color);
-                
+
                 // Mirror on right side
                 let mirror_col = cols - 1 - col;
                 let mirror_x = mirror_col as u32 * block_size;
@@ -507,21 +513,21 @@ fn generate_pixel_pattern<R: Rng>(rng: &mut R) -> RgbImage {
             }
         }
     }
-    
+
     img
 }
 
 /// Striped pattern
 fn generate_stripes<R: Rng>(rng: &mut R) -> RgbImage {
     let mut img = ImageBuffer::new(IMAGE_WIDTH, IMAGE_HEIGHT);
-    
+
     let num_colors = rng.gen_range(2..5);
     let colors: Vec<[u8; 3]> = (0..num_colors).map(|_| random_color(rng)).collect();
-    
+
     let stripe_width = rng.gen_range(10..50);
     let horizontal = rng.gen_bool(0.5);
     let diagonal = rng.gen_bool(0.3);
-    
+
     for (x, y, pixel) in img.enumerate_pixels_mut() {
         let pos = if diagonal {
             (x as i32 + y as i32) as u32
@@ -530,11 +536,11 @@ fn generate_stripes<R: Rng>(rng: &mut R) -> RgbImage {
         } else {
             x
         };
-        
+
         let stripe_idx = (pos / stripe_width) as usize % colors.len();
         *pixel = Rgb(colors[stripe_idx]);
     }
-    
+
     img
 }
 
@@ -544,25 +550,25 @@ fn generate_symmetric_avatar<R: Rng>(rng: &mut R) -> RgbImage {
     let bg_color = random_light_color(rng);
     let fg_color = random_saturated_color(rng);
     let mut img = ImageBuffer::from_pixel(size, size, Rgb(bg_color));
-    
+
     let block_size = 16u32;
     let blocks = size / block_size;
     let half_blocks = (blocks + 1) / 2;
-    
+
     for row in 0..blocks {
         for col in 0..half_blocks {
             if rng.gen_bool(0.55) {
                 let x = col * block_size;
                 let y = row * block_size;
                 draw_rect(&mut img, x, y, block_size, block_size, fg_color);
-                
+
                 // Mirror
                 let mirror_x = (blocks - 1 - col) * block_size;
                 draw_rect(&mut img, mirror_x, y, block_size, block_size, fg_color);
             }
         }
     }
-    
+
     img
 }
 
@@ -594,7 +600,7 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> Color {
     let c = v * s;
     let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
     let m = v - c;
-    
+
     let (r, g, b) = if h < 60.0 {
         (c, x, 0.0)
     } else if h < 120.0 {
@@ -608,7 +614,7 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> Color {
     } else {
         (c, 0.0, x)
     };
-    
+
     [
         ((r + m) * 255.0) as u8,
         ((g + m) * 255.0) as u8,
@@ -644,7 +650,7 @@ fn draw_circle(img: &mut RgbImage, cx: i32, cy: i32, radius: i32, color: Color, 
                 let dy = y - cy;
                 let dist_sq = dx * dx + dy * dy;
                 let radius_sq = radius * radius;
-                
+
                 if filled {
                     if dist_sq <= radius_sq {
                         img.put_pixel(x as u32, y as u32, Rgb(color));

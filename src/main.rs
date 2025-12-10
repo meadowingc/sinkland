@@ -2,27 +2,29 @@ mod data;
 mod generators;
 
 use data::{BOOK_DATA, HAIKU_DATA};
-use generators::images::{generate_avatar_from_seed, generate_banner_from_seed, generate_image_from_seed};
+use generators::images::{
+    generate_avatar_from_seed, generate_banner_from_seed, generate_image_from_seed,
+};
 use generators::social::{
     generate_comments_random, generate_feed_random, generate_post_random,
-    generate_suggested_users_random, generate_trending_topics,
-    generate_user_likes_random, generate_user_media_posts_random,
-    generate_user_random, generate_user_posts_random, generate_user_replies_random,
+    generate_suggested_users_random, generate_trending_topics, generate_user_likes_random,
+    generate_user_media_posts_random, generate_user_posts_random, generate_user_random,
+    generate_user_replies_random,
 };
 
 use image::ImageFormat;
 use once_cell::sync::Lazy;
 use poem::{
+    Response, Route, Server,
     endpoint::StaticFilesEndpoint,
     error::InternalServerError,
     get, handler,
     http::StatusCode,
     listener::TcpListener,
     web::{Html, Path},
-    Response, Route, Server,
 };
-use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::seq::SliceRandom;
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tera::{Context, Tera};
@@ -413,7 +415,9 @@ fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poe
 }
 
 #[handler]
-fn social_user_subpage(Path((username, subpage)): Path<(String, String)>) -> Result<Html<String>, poem::Error> {
+fn social_user_subpage(
+    Path((username, subpage)): Path<(String, String)>,
+) -> Result<Html<String>, poem::Error> {
     let total_visits = increment_visits();
 
     // Generate fresh random content on every page visit

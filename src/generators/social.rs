@@ -1,6 +1,6 @@
 use crate::data::{BOOK_DATA, HAIKU_DATA, NAME_DATA, SHORT_PHRASES};
-use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::seq::SliceRandom;
 use serde::Serialize;
 
 /// A social media user
@@ -180,16 +180,47 @@ fn generate_follower_count<R: Rng>(rng: &mut R) -> u32 {
 fn generate_hashtags<R: Rng>(rng: &mut R, count: usize) -> Vec<String> {
     // Mix of noun-based hashtags and common social media hashtags
     let common_hashtags = [
-        "fyp", "viral", "trending", "mood", "vibes", "aesthetic", "goals",
-        "love", "life", "inspo", "daily", "thoughts", "random", "real",
-        "foryou", "relatable", "truth", "facts", "same", "blessed",
-        "grateful", "happy", "peace", "mindset", "growth", "journey",
-        "art", "nature", "photography", "food", "travel", "fitness",
-        "motivation", "inspiration", "wellness", "selfcare", "mindfulness",
+        "fyp",
+        "viral",
+        "trending",
+        "mood",
+        "vibes",
+        "aesthetic",
+        "goals",
+        "love",
+        "life",
+        "inspo",
+        "daily",
+        "thoughts",
+        "random",
+        "real",
+        "foryou",
+        "relatable",
+        "truth",
+        "facts",
+        "same",
+        "blessed",
+        "grateful",
+        "happy",
+        "peace",
+        "mindset",
+        "growth",
+        "journey",
+        "art",
+        "nature",
+        "photography",
+        "food",
+        "travel",
+        "fitness",
+        "motivation",
+        "inspiration",
+        "wellness",
+        "selfcare",
+        "mindfulness",
     ];
-    
+
     let mut tags = Vec::with_capacity(count);
-    
+
     for _ in 0..count {
         let tag = if rng.gen_bool(0.6) {
             // Use a noun from our data
@@ -207,7 +238,7 @@ fn generate_hashtags<R: Rng>(rng: &mut R, count: usize) -> Vec<String> {
         };
         tags.push(format!("#{}", tag));
     }
-    
+
     tags
 }
 
@@ -226,12 +257,12 @@ fn hashtag_to_link(tag: &str) -> String {
 fn add_hashtags_to_content<R: Rng>(rng: &mut R, content: &str) -> String {
     // 40% chance of no hashtags, 35% chance of hashtags at end, 25% chance of inline hashtags
     let hashtag_style = rng.gen_range(0..100);
-    
+
     if hashtag_style < 40 {
         // No hashtags
         return content.to_string();
     }
-    
+
     if hashtag_style < 75 {
         // Add hashtags at the end (1-4 hashtags)
         let num_tags = rng.gen_range(1..=4);
@@ -239,7 +270,7 @@ fn add_hashtags_to_content<R: Rng>(rng: &mut R, content: &str) -> String {
         let linked_tags: Vec<String> = tags.iter().map(|t| hashtag_to_link(t)).collect();
         return format!("{}<br><br>{}", content, linked_tags.join(" "));
     }
-    
+
     // Inline hashtags - convert some words to hashtags
     let words: Vec<&str> = content.split_whitespace().collect();
     if words.len() < 3 {
@@ -249,24 +280,21 @@ fn add_hashtags_to_content<R: Rng>(rng: &mut R, content: &str) -> String {
         let linked_tags: Vec<String> = tags.iter().map(|t| hashtag_to_link(t)).collect();
         return format!("{} {}", content, linked_tags.join(" "));
     }
-    
+
     // Find words that could become hashtags (nouns, longer words)
     let mut result_words: Vec<String> = Vec::with_capacity(words.len());
     let mut hashtags_added = 0;
     let max_inline_hashtags = rng.gen_range(1..=2);
-    
+
     for word in &words {
         // Clean the word to check if it's hashtaggable
-        let clean_word: String = word
-            .chars()
-            .filter(|c| c.is_alphanumeric())
-            .collect();
-        
-        let can_hashtag = clean_word.len() >= 4 
+        let clean_word: String = word.chars().filter(|c| c.is_alphanumeric()).collect();
+
+        let can_hashtag = clean_word.len() >= 4
             && clean_word.chars().all(|c| c.is_alphabetic())
             && hashtags_added < max_inline_hashtags
             && rng.gen_bool(0.15); // 15% chance per eligible word
-        
+
         if can_hashtag {
             // Extract punctuation
             let (prefix, suffix) = extract_punctuation(word);
@@ -277,13 +305,17 @@ fn add_hashtags_to_content<R: Rng>(rng: &mut R, content: &str) -> String {
             result_words.push(word.to_string());
         }
     }
-    
+
     // If no inline hashtags were added, add some at the end
     if hashtags_added == 0 {
         let num_tags = rng.gen_range(1..=3);
         let tags = generate_hashtags(rng, num_tags);
         let linked_tags: Vec<String> = tags.iter().map(|t| hashtag_to_link(t)).collect();
-        format!("{}<br><br>{}", result_words.join(" "), linked_tags.join(" "))
+        format!(
+            "{}<br><br>{}",
+            result_words.join(" "),
+            linked_tags.join(" ")
+        )
     } else {
         result_words.join(" ")
     }
@@ -292,7 +324,14 @@ fn add_hashtags_to_content<R: Rng>(rng: &mut R, content: &str) -> String {
 /// Extract leading and trailing punctuation from a word
 fn extract_punctuation(word: &str) -> (String, String) {
     let prefix: String = word.chars().take_while(|c| !c.is_alphanumeric()).collect();
-    let suffix: String = word.chars().rev().take_while(|c| !c.is_alphanumeric()).collect::<String>().chars().rev().collect();
+    let suffix: String = word
+        .chars()
+        .rev()
+        .take_while(|c| !c.is_alphanumeric())
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect();
     (prefix, suffix)
 }
 
@@ -459,7 +498,10 @@ fn generate_image_alt<R: Rng>(rng: &mut R) -> String {
                 "cherry blossoms in spring",
                 "snow-covered forest trail",
             ];
-            scenes.choose(rng).unwrap_or(&"peaceful scenery").to_string()
+            scenes
+                .choose(rng)
+                .unwrap_or(&"peaceful scenery")
+                .to_string()
         }
         1 => {
             // Abstract/artistic
@@ -496,7 +538,14 @@ fn generate_image_alt<R: Rng>(rng: &mut R) -> String {
         }
         4 => {
             // Art/creative
-            let mediums = ["watercolor", "digital art", "photograph", "sketch", "painting", "collage"];
+            let mediums = [
+                "watercolor",
+                "digital art",
+                "photograph",
+                "sketch",
+                "painting",
+                "collage",
+            ];
             let medium = mediums.choose(rng).unwrap_or(&"artwork");
             let noun = NAME_DATA.nouns.choose(rng).unwrap_or(&"dreams");
             format!("{} of {}", medium, noun)
@@ -547,7 +596,10 @@ fn generate_post_random_with_image<R: Rng>(rng: &mut R, force_image: Option<bool
     let has_image = force_image.unwrap_or_else(|| rng.gen_bool(0.3));
     let (image_id, image_alt) = if has_image {
         let random_id: u64 = rng.gen_range(0..u64::MAX);
-        (Some(format!("img_{:x}", random_id)), Some(generate_image_alt(rng)))
+        (
+            Some(format!("img_{:x}", random_id)),
+            Some(generate_image_alt(rng)),
+        )
     } else {
         (None, None)
     };
@@ -654,7 +706,11 @@ pub fn generate_user_likes_random<R: Rng>(rng: &mut R, count: usize) -> Vec<Post
 }
 
 /// Generate media-only posts for a user (posts with images)
-pub fn generate_user_media_posts_random<R: Rng>(rng: &mut R, user: &User, count: usize) -> Vec<Post> {
+pub fn generate_user_media_posts_random<R: Rng>(
+    rng: &mut R,
+    user: &User,
+    count: usize,
+) -> Vec<Post> {
     (0..count)
         .map(|_| {
             let mut post = generate_post_random_with_image(rng, Some(true));
