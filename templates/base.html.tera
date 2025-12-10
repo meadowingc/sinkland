@@ -181,7 +181,11 @@
     <footer class="site-footer">
         <div class="footer-container">
             <p class="footer-text">
-                📊 Total page visits: <strong>{{ total_visits | default(value=0) }}</strong>
+                📊 Page visits: 
+                <span class="visit-stat">📚 Blog: <strong>{{ blog_visits | default(value=0) }}</strong></span> · 
+                <span class="visit-stat">🍃 Haiku: <strong>{{ haiku_visits | default(value=0) }}</strong></span> · 
+                <span class="visit-stat">💬 Social: <strong>{{ social_visits | default(value=0) }}</strong></span><br/> 
+                <span class="visit-stat">🌐 Total: <strong>{{ total_visits | default(value=0) }}</strong></span>
             </p>
         </div>
     </footer>

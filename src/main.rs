@@ -41,12 +41,80 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
     tera
 });
 
-// Single unified visit counter for all pages
-static TOTAL_VISITS: AtomicUsize = AtomicUsize::new(144784);
+// Section-specific visit counters
 
-/// Increment and get the total visit count
-fn increment_visits() -> usize {
-    TOTAL_VISITS.fetch_add(1, Ordering::Relaxed) + 1
+// as of 2025-12-10
+static BLOG_VISITS: AtomicUsize = AtomicUsize::new(144788);
+static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(5303);
+static SOCIAL_VISITS: AtomicUsize = AtomicUsize::new(0);
+
+/// Visit counts for all sections
+#[derive(Clone)]
+struct VisitCounts {
+    blog: usize,
+    haiku: usize,
+    social: usize,
+    total: usize,
+}
+
+/// Increment blog visits and return all counts
+fn increment_blog_visits() -> VisitCounts {
+    let blog = BLOG_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
+    let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
+    let social = SOCIAL_VISITS.load(Ordering::Relaxed);
+    VisitCounts {
+        blog,
+        haiku,
+        social,
+        total: blog + haiku + social,
+    }
+}
+
+/// Increment haiku visits and return all counts
+fn increment_haiku_visits() -> VisitCounts {
+    let blog = BLOG_VISITS.load(Ordering::Relaxed);
+    let haiku = HAIKU_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
+    let social = SOCIAL_VISITS.load(Ordering::Relaxed);
+    VisitCounts {
+        blog,
+        haiku,
+        social,
+        total: blog + haiku + social,
+    }
+}
+
+/// Increment social visits and return all counts
+fn increment_social_visits() -> VisitCounts {
+    let blog = BLOG_VISITS.load(Ordering::Relaxed);
+    let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
+    let social = SOCIAL_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
+    VisitCounts {
+        blog,
+        haiku,
+        social,
+        total: blog + haiku + social,
+    }
+}
+
+/// Get current visit counts without incrementing (for index page)
+fn get_visit_counts() -> VisitCounts {
+    let blog = BLOG_VISITS.load(Ordering::Relaxed);
+    let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
+    let social = SOCIAL_VISITS.load(Ordering::Relaxed);
+    VisitCounts {
+        blog,
+        haiku,
+        social,
+        total: blog + haiku + social,
+    }
+}
+
+/// Helper to insert visit counts into template context
+fn insert_visit_counts(context: &mut Context, counts: &VisitCounts) {
+    context.insert("blog_visits", &counts.blog);
+    context.insert("haiku_visits", &counts.haiku);
+    context.insert("social_visits", &counts.social);
+    context.insert("total_visits", &counts.total);
 }
 
 // Helper function to generate random paragraphs
@@ -277,7 +345,7 @@ fn generate_random_haiku() -> String {
 
 #[handler]
 fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
-    let total_visits = increment_visits();
+    let visit_counts = increment_blog_visits();
 
     let mut rng = rand::thread_rng();
 
@@ -298,7 +366,7 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
     context.insert("title", &title);
     context.insert("paragraphs", &paragraphs);
     context.insert("links", &links);
-    context.insert("total_visits", &total_visits);
+    insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
         .render("book_random_sink.html.tera", &context)
@@ -308,7 +376,7 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
 
 #[handler]
 fn index() -> Result<Html<String>, poem::Error> {
-    let total_visits = increment_visits();
+    let visit_counts = get_visit_counts();
 
     let mut rng = rand::thread_rng();
 
@@ -326,7 +394,7 @@ fn index() -> Result<Html<String>, poem::Error> {
     context.insert("paragraphs", &paragraphs);
     context.insert("links", &links);
     context.insert("haiku_links", &haiku_links);
-    context.insert("total_visits", &total_visits);
+    insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
         .render("index_trap.html.tera", &context)
@@ -341,7 +409,7 @@ async fn robots_txt() -> &'static str {
 
 #[handler]
 fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
-    let total_visits = increment_visits();
+    let visit_counts = increment_haiku_visits();
 
     let mut rng = rand::thread_rng();
 
@@ -361,7 +429,7 @@ fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
     context.insert("title", &title);
     context.insert("haiku", &haiku);
     context.insert("links", &links);
-    context.insert("total_visits", &total_visits);
+    insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
         .render("haiku_trap.html.tera", &context)
@@ -373,7 +441,7 @@ fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
 
 #[handler]
 fn social_feed() -> Result<Html<String>, poem::Error> {
-    let total_visits = increment_visits();
+    let visit_counts = increment_social_visits();
 
     // Generate fresh random content on every page visit
     let mut rng = rand::thread_rng();
@@ -385,7 +453,7 @@ fn social_feed() -> Result<Html<String>, poem::Error> {
     context.insert("posts", &posts);
     context.insert("trending", &trending);
     context.insert("suggested_users", &suggested_users);
-    context.insert("total_visits", &total_visits);
+    insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
         .render("social/feed.html.tera", &context)
@@ -395,7 +463,7 @@ fn social_feed() -> Result<Html<String>, poem::Error> {
 
 #[handler]
 fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poem::Error> {
-    let total_visits = increment_visits();
+    let visit_counts = increment_social_visits();
 
     // Generate fresh random content on every page visit
     let mut rng = rand::thread_rng();
@@ -406,7 +474,7 @@ fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poe
     context.insert("user", &user);
     context.insert("posts", &posts);
     context.insert("active_tab", "posts");
-    context.insert("total_visits", &total_visits);
+    insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
         .render("social/profile.html.tera", &context)
@@ -418,7 +486,7 @@ fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poe
 fn social_user_subpage(
     Path((username, subpage)): Path<(String, String)>,
 ) -> Result<Html<String>, poem::Error> {
-    let total_visits = increment_visits();
+    let visit_counts = increment_social_visits();
 
     // Generate fresh random content on every page visit
     let mut rng = rand::thread_rng();
@@ -426,7 +494,7 @@ fn social_user_subpage(
 
     let mut context = Context::new();
     context.insert("user", &user);
-    context.insert("total_visits", &total_visits);
+    insert_visit_counts(&mut context, &visit_counts);
 
     // Generate content based on the subpage/tab
     match subpage.as_str() {
@@ -462,7 +530,7 @@ fn social_user_subpage(
 
 #[handler]
 fn social_post_page(Path(_post_id): Path<String>) -> Result<Html<String>, poem::Error> {
-    let total_visits = increment_visits();
+    let visit_counts = increment_social_visits();
 
     // Generate fresh random content on every page visit
     let mut rng = rand::thread_rng();
@@ -475,7 +543,7 @@ fn social_post_page(Path(_post_id): Path<String>) -> Result<Html<String>, poem::
     context.insert("post", &post);
     context.insert("comments", &comments);
     context.insert("related_posts", &related_posts);
-    context.insert("total_visits", &total_visits);
+    insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
         .render("social/post.html.tera", &context)
@@ -485,7 +553,7 @@ fn social_post_page(Path(_post_id): Path<String>) -> Result<Html<String>, poem::
 
 #[handler]
 fn social_search(Path(_query): Path<String>) -> Result<Html<String>, poem::Error> {
-    let total_visits = increment_visits();
+    let visit_counts = increment_social_visits();
 
     // Generate fresh random content on every page visit
     let mut rng = rand::thread_rng();
@@ -497,7 +565,7 @@ fn social_search(Path(_query): Path<String>) -> Result<Html<String>, poem::Error
     context.insert("posts", &posts);
     context.insert("trending", &trending);
     context.insert("suggested_users", &suggested_users);
-    context.insert("total_visits", &total_visits);
+    insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
         .render("social/feed.html.tera", &context)
