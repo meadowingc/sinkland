@@ -176,6 +176,149 @@ fn generate_follower_count<R: Rng>(rng: &mut R) -> u32 {
     }
 }
 
+/// Generate random hashtags
+fn generate_hashtags<R: Rng>(rng: &mut R, count: usize) -> Vec<String> {
+    // Mix of noun-based hashtags and common social media hashtags
+    let common_hashtags = [
+        "fyp", "viral", "trending", "mood", "vibes", "aesthetic", "goals",
+        "love", "life", "inspo", "daily", "thoughts", "random", "real",
+        "foryou", "relatable", "truth", "facts", "same", "blessed",
+        "grateful", "happy", "peace", "mindset", "growth", "journey",
+        "art", "nature", "photography", "food", "travel", "fitness",
+        "motivation", "inspiration", "wellness", "selfcare", "mindfulness",
+    ];
+    
+    let mut tags = Vec::with_capacity(count);
+    
+    for _ in 0..count {
+        let tag = if rng.gen_bool(0.6) {
+            // Use a noun from our data
+            NAME_DATA
+                .nouns
+                .choose(rng)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "vibes".to_string())
+        } else {
+            // Use a common hashtag
+            common_hashtags
+                .choose(rng)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "mood".to_string())
+        };
+        tags.push(format!("#{}", tag));
+    }
+    
+    tags
+}
+
+/// Convert a hashtag to an HTML link
+fn hashtag_to_link(tag: &str) -> String {
+    // Tag includes the # already
+    let tag_name = tag.trim_start_matches('#');
+    format!(
+        r#"<a href="/social/search/{}" style="color: #1da1f2; text-decoration: none;" rel="nofollow noopener noreferrer">{}</a>"#,
+        urlencoding::encode(tag_name),
+        tag
+    )
+}
+
+/// Add hashtags to content - either inline or at the end
+fn add_hashtags_to_content<R: Rng>(rng: &mut R, content: &str) -> String {
+    // 40% chance of no hashtags, 35% chance of hashtags at end, 25% chance of inline hashtags
+    let hashtag_style = rng.gen_range(0..100);
+    
+    if hashtag_style < 40 {
+        // No hashtags
+        return content.to_string();
+    }
+    
+    if hashtag_style < 75 {
+        // Add hashtags at the end (1-4 hashtags)
+        let num_tags = rng.gen_range(1..=4);
+        let tags = generate_hashtags(rng, num_tags);
+        let linked_tags: Vec<String> = tags.iter().map(|t| hashtag_to_link(t)).collect();
+        return format!("{}<br><br>{}", content, linked_tags.join(" "));
+    }
+    
+    // Inline hashtags - convert some words to hashtags
+    let words: Vec<&str> = content.split_whitespace().collect();
+    if words.len() < 3 {
+        // Too short, just add hashtags at end
+        let num_tags = rng.gen_range(1..=2);
+        let tags = generate_hashtags(rng, num_tags);
+        let linked_tags: Vec<String> = tags.iter().map(|t| hashtag_to_link(t)).collect();
+        return format!("{} {}", content, linked_tags.join(" "));
+    }
+    
+    // Find words that could become hashtags (nouns, longer words)
+    let mut result_words: Vec<String> = Vec::with_capacity(words.len());
+    let mut hashtags_added = 0;
+    let max_inline_hashtags = rng.gen_range(1..=2);
+    
+    for word in &words {
+        // Clean the word to check if it's hashtaggable
+        let clean_word: String = word
+            .chars()
+            .filter(|c| c.is_alphanumeric())
+            .collect();
+        
+        let can_hashtag = clean_word.len() >= 4 
+            && clean_word.chars().all(|c| c.is_alphabetic())
+            && hashtags_added < max_inline_hashtags
+            && rng.gen_bool(0.15); // 15% chance per eligible word
+        
+        if can_hashtag {
+            // Extract punctuation
+            let (prefix, suffix) = extract_punctuation(word);
+            let hashtag = format!("#{}", clean_word.to_lowercase());
+            result_words.push(format!("{}{}{}", prefix, hashtag_to_link(&hashtag), suffix));
+            hashtags_added += 1;
+        } else {
+            result_words.push(word.to_string());
+        }
+    }
+    
+    // If no inline hashtags were added, add some at the end
+    if hashtags_added == 0 {
+        let num_tags = rng.gen_range(1..=3);
+        let tags = generate_hashtags(rng, num_tags);
+        let linked_tags: Vec<String> = tags.iter().map(|t| hashtag_to_link(t)).collect();
+        format!("{}<br><br>{}", result_words.join(" "), linked_tags.join(" "))
+    } else {
+        result_words.join(" ")
+    }
+}
+
+/// Extract leading and trailing punctuation from a word
+fn extract_punctuation(word: &str) -> (String, String) {
+    let chars: Vec<char> = word.chars().collect();
+    let mut prefix = String::new();
+    let mut suffix = String::new();
+    
+    // Find prefix punctuation
+    for c in chars.iter() {
+        if c.is_alphanumeric() {
+            break;
+        }
+        prefix.push(*c);
+    }
+    
+    // Find suffix punctuation
+    let mut end = chars.len();
+    for (i, c) in chars.iter().enumerate().rev() {
+        if c.is_alphanumeric() {
+            end = i + 1;
+            break;
+        }
+    }
+    
+    for c in &chars[end..] {
+        suffix.push(*c);
+    }
+    
+    (prefix, suffix)
+}
+
 fn generate_post_content<R: Rng>(rng: &mut R) -> String {
     let style = rng.gen_range(0..6);
 
@@ -414,8 +557,9 @@ pub fn generate_post_random<R: Rng>(rng: &mut R) -> Post {
     let username = generate_username(rng);
     let author = generate_user_random(rng, &username);
 
-    // Generate content
-    let content = generate_post_content(rng);
+    // Generate content and add hashtags
+    let base_content = generate_post_content(rng);
+    let content = add_hashtags_to_content(rng, &base_content);
 
     // Decide if this post has an image (30% chance)
     let has_image = rng.gen_bool(0.3);

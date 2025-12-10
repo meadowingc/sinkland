@@ -376,9 +376,9 @@
             </div>
         </div>
         
-        <a href="/social/post/{{ post.id }}" class="post-content" rel="nofollow noopener noreferrer">
-            {{ post.content }}
-        </a>
+        <div class="post-content">
+            {{ post.content | safe }}
+        </div>
         
         {% if post.has_image %}
         <a href="/social/post/{{ post.id }}" rel="nofollow noopener noreferrer">

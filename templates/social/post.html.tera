@@ -1,6 +1,6 @@
 {% extends "base.html.tera" %}
 
-{% block title %}{{ post.author.display_name }} on SinkNet: "{{ post.content | truncate(length=50) }}"{% endblock title %}
+{% block title %}{{ post.author.display_name }} on SinkNet: "{{ post.content | striptags | truncate(length=50) }}"{% endblock title %}
 
 {% block extra_styles %}
 .post-container {
@@ -318,7 +318,7 @@
         </div>
         
         <div class="post-content">
-            {{ post.content }}
+            {{ post.content | safe }}
         </div>
         
         {% if post.has_image %}
@@ -326,7 +326,7 @@
         {% endif %}
         
         <div class="post-meta">
-            {{ post.timestamp }} · <span style="color: #1da1f2;">SinkNet Web App</span>
+            {{ post.timestamp }}
         </div>
         
         <div class="post-stats">
@@ -395,16 +395,18 @@
     <div class="related-posts">
         <h3>More posts you might like</h3>
         {% for related in related_posts %}
-        <a href="/social/post/{{ related.id }}" class="related-post" rel="nofollow noopener noreferrer">
-            <img src="/social/avatar/{{ related.author.username }}.png" alt="Avatar for {{ related.author.display_name }}" class="avatar">
-            <div class="user-info">
-                <span class="display-name">
+        <div class="related-post">
+            <a href="/social/user/{{ related.author.username }}" rel="nofollow noopener noreferrer">
+                <img src="/social/avatar/{{ related.author.username }}.png" alt="Avatar for {{ related.author.display_name }}" class="avatar">
+            </a>
+            <span class="user-info">
+                <a href="/social/post/{{ related.id }}" class="display-name" rel="nofollow noopener noreferrer" style="display: block;">
                     {{ related.author.display_name }}
                     {% if related.author.verified %}<span class="verified-badge">✓</span>{% endif %}
-                </span>
-                <div class="preview">{{ related.content | truncate(length=60) }}</div>
-            </div>
-        </a>
+                </a>
+                <a href="/social/post/{{ related.id }}" class="preview" rel="nofollow noopener noreferrer" style="display: block;">{{ related.content | striptags | truncate(length=60) }}</a>
+            </span>
+        </div>
         {% endfor %}
     </div>
 </div>

@@ -40,7 +40,7 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
 });
 
 // Single unified visit counter for all pages
-static TOTAL_VISITS: AtomicUsize = AtomicUsize::new(0);
+static TOTAL_VISITS: AtomicUsize = AtomicUsize::new(144784);
 
 /// Increment and get the total visit count
 fn increment_visits() -> usize {
