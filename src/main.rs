@@ -1,7 +1,7 @@
 mod data;
 mod generators;
 
-use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA};
+use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA, SMALLWEB_LIST};
 use generators::images::{
     generate_avatar_from_seed, generate_banner_from_seed, generate_image_from_seed,
 };
@@ -237,6 +237,7 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
     let mut rng = rand::thread_rng();
     let num_links = num_links.min(BOOK_DATA.titles.len());
     let friends = &*FRIENDS_LIST;
+    let smallweb = &*SMALLWEB_LIST;
 
     BOOK_DATA
         .titles
@@ -255,9 +256,15 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
             let month = (day_of_year / 30).min(11) + 1;
             let day = (day_of_year % 30) + 1;
 
-            // chance to generate an external friend link if friends exist
-            if !friends.is_empty() && rng.gen_bool(0.30) {
-                // For friend links: clean slug with only alphanumeric and hyphens (no escaping)
+            // Decide link type: ~10% legitimate smallweb, ~25% friend trap, ~65% internal trap
+            let roll: f64 = rng.gen_range(0.0..1.0);
+
+            if !smallweb.is_empty() && roll < 0.10 {
+                // Legitimate link to a small web site (just the homepage)
+                let site = smallweb.choose(&mut rng).unwrap();
+                (link_title.clone(), site.clone())
+            } else if !friends.is_empty() && roll < 0.35 {
+                // Friend trap link with generated path
                 let clean_slug: String = link_title
                     .to_lowercase()
                     .chars()
@@ -279,7 +286,7 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
                 );
                 (link_title.clone(), external_url)
             } else {
-                // For internal links: URL-encoded slug
+                // Internal trap link
                 let slug = link_title
                     .to_lowercase()
                     .trim()
