@@ -3,6 +3,19 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
+    // Create .env file template if it doesn't exist
+    let env_file = ".env";
+    if !Path::new(env_file).exists() {
+        println!("cargo:warning=Creating template .env file...");
+        let template = r#"# Sinkland Configuration
+# Friends list - JSON array of URLs
+# This file is gitignored to keep friend links private
+SINKLAND_FRIENDS='[]'
+"#;
+        fs::write(env_file, template).expect("Failed to create .env file");
+        println!("cargo:warning=Created .env file - edit it to add your friends list");
+    }
+
     let books_dir = "assets/books";
 
     // Create books directory if it doesn't exist

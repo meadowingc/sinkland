@@ -2,6 +2,32 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::collections::HashSet;
 
+// Load .env file on first access
+static ENV_LOADED: Lazy<()> = Lazy::new(|| {
+    let _ = dotenvy::dotenv();
+});
+
+// Friends list loaded from .env file (SINKLAND_FRIENDS)
+// Format: JSON array of URLs
+// Example: SINKLAND_FRIENDS='["https://example.com/page"]'
+pub static FRIENDS_LIST: Lazy<Vec<String>> = Lazy::new(|| {
+    // Ensure .env is loaded
+    Lazy::force(&ENV_LOADED);
+    
+    match std::env::var("SINKLAND_FRIENDS") {
+        Ok(json_str) => {
+            serde_json::from_str(&json_str).unwrap_or_else(|e| {
+                eprintln!("Warning: Failed to parse SINKLAND_FRIENDS: {e}");
+                Vec::new()
+            })
+        }
+        Err(_) => {
+            eprintln!("Warning: SINKLAND_FRIENDS not set, friends list will be empty");
+            Vec::new()
+        }
+    }
+});
+
 // Haiku data structure
 #[derive(Deserialize)]
 pub struct HaikuData {

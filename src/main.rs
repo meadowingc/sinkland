@@ -43,10 +43,10 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
 
 // Section-specific visit counters
 
-// as of 2025-12-10
-static BLOG_VISITS: AtomicUsize = AtomicUsize::new(144788);
-static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(5303);
-static SOCIAL_VISITS: AtomicUsize = AtomicUsize::new(0);
+// as of 2025-12-18
+static BLOG_VISITS: AtomicUsize = AtomicUsize::new(1854446);
+static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(18137);
+static SOCIAL_VISITS: AtomicUsize = AtomicUsize::new(1259);
 
 /// Visit counts for all sections
 #[derive(Clone)]
@@ -394,6 +394,7 @@ fn index() -> Result<Html<String>, poem::Error> {
     context.insert("paragraphs", &paragraphs);
     context.insert("links", &links);
     context.insert("haiku_links", &haiku_links);
+    
     insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES

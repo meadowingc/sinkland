@@ -166,7 +166,6 @@
         <div class="navbar-container">
             <a href="/" class="navbar-brand" rel="nofollow noopener noreferrer">Literature Archive</a>
             <ul class="navbar-links">
-                <li><a href="/" rel="nofollow noopener noreferrer">Index</a></li>
                 <li><a href="/blog/blog-posts" rel="nofollow noopener noreferrer">Blog</a></li>
                 <li><a href="/haiku/reflections" rel="nofollow noopener noreferrer">Haiku</a></li>
                 <li><a href="/social" rel="nofollow noopener noreferrer">Social</a></li>
