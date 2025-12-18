@@ -393,12 +393,38 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
     let paragraphs = generate_random_paragraphs(num_paragraphs, (3, 6));
     let paragraphs = add_inline_links_to_paragraphs(paragraphs);
 
+    // 20% chance of having images
+    let images: Vec<(String, String)> = if rng.gen_bool(0.20) {
+        // 90% single, 7% two, 3% three
+        // let roll: f64 = rng.gen_range(0.0..1.0);
+        // let num_images = if roll < 0.90 { 1 } else if roll < 0.97 { 2 } else { 3 };
+        
+        let num_images = 1;
+        
+        (0..num_images)
+            .map(|_| {
+                let seed: u64 = rng.gen_range(0..u64::MAX);
+                let url = format!("/social/media/{}.png", seed);
+                // Generate random alt text from book titles
+                let alt = BOOK_DATA
+                    .titles
+                    .choose(&mut rng)
+                    .cloned()
+                    .unwrap_or_else(|| "Illustration".to_string());
+                (url, alt)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     let num_links = rng.gen_range(2..=7);
     let links = generate_random_links(num_links);
 
     let mut context = Context::new();
     context.insert("title", &title);
     context.insert("paragraphs", &paragraphs);
+    context.insert("images", &images);
     context.insert("links", &links);
     insert_visit_counts(&mut context, &visit_counts);
 
