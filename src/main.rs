@@ -1,7 +1,7 @@
 mod data;
 mod generators;
 
-use data::{BOOK_DATA, HAIKU_DATA};
+use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA};
 use generators::images::{
     generate_avatar_from_seed, generate_banner_from_seed, generate_image_from_seed,
 };
@@ -236,6 +236,7 @@ fn extract_word_and_punctuation(word: &str) -> (String, String) {
 fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
     let mut rng = rand::thread_rng();
     let num_links = num_links.min(BOOK_DATA.titles.len());
+    let friends = &*FRIENDS_LIST;
 
     BOOK_DATA
         .titles
@@ -254,17 +255,43 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
             let month = (day_of_year / 30).min(11) + 1;
             let day = (day_of_year % 30) + 1;
 
-            let slug = link_title
-                .to_lowercase()
-                .trim()
-                .replace(' ', "-")
-                .replace('.', "");
-            let url_slug = urlencoding::encode(&slug);
+            // chance to generate an external friend link if friends exist
+            if !friends.is_empty() && rng.gen_bool(0.30) {
+                // For friend links: clean slug with only alphanumeric and hyphens (no escaping)
+                let clean_slug: String = link_title
+                    .to_lowercase()
+                    .chars()
+                    .map(|c| if c.is_alphanumeric() { c } else { '-' })
+                    .collect::<String>()
+                    .split('-')
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>()
+                    .join("-");
 
-            (
-                link_title.clone(),
-                format!("/blog/{:04}/{:02}/{:02}/{}", year, month, day, url_slug),
-            )
+                let friend_url = friends.choose(&mut rng).unwrap();
+                let external_url = format!(
+                    "{}/{:04}-{:02}-{:02}--{}/",
+                    friend_url.trim_end_matches('/'),
+                    year,
+                    month,
+                    day,
+                    clean_slug
+                );
+                (link_title.clone(), external_url)
+            } else {
+                // For internal links: URL-encoded slug
+                let slug = link_title
+                    .to_lowercase()
+                    .trim()
+                    .replace(' ', "-")
+                    .replace('.', "");
+                let url_slug = urlencoding::encode(&slug).into_owned();
+
+                (
+                    link_title.clone(),
+                    format!("/blog/{:04}/{:02}/{:02}/{}", year, month, day, url_slug),
+                )
+            }
         })
         .collect()
 }
@@ -299,7 +326,7 @@ fn generate_haiku_links(num_links: usize) -> Vec<(String, String)> {
                 .chars()
                 .filter(|c| c.is_alphanumeric() || *c == '-')
                 .collect::<String>();
-            let url_slug = urlencoding::encode(&slug);
+            let url_slug = urlencoding::encode(&slug).into_owned();
 
             (
                 link_text.clone(),
@@ -394,7 +421,7 @@ fn index() -> Result<Html<String>, poem::Error> {
     context.insert("paragraphs", &paragraphs);
     context.insert("links", &links);
     context.insert("haiku_links", &haiku_links);
-    
+
     insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
