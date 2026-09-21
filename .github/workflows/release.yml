@@ -49,15 +49,17 @@ jobs:
           bash -n scripts/install-pi.sh
           shellcheck scripts/install-pi.sh
           python3 -m unittest discover -s tests -p 'test_*.py' -v
-      - name: Build static ARM64 binary
-        run: cargo +stable build --locked --release --target aarch64-unknown-linux-musl
+      - name: Build and test static ARM64 binary
+        run: |
+          cargo +stable test --locked --release --target aarch64-unknown-linux-musl
+          cargo +stable build --locked --release --target aarch64-unknown-linux-musl
       - name: Package runtime files
         run: |
-          mkdir -p package dist
+          mkdir -p package/assets dist
           install -m 755 target/aarch64-unknown-linux-musl/release/sinkland package/sinkland
-          cp -R assets templates static package/
+          cp -R assets/books assets/haikus.json package/assets/
+          cp -R templates static package/
           printf '%s\n' "$RELEASE_TAG" > package/VERSION
-          test -s package/assets/smallweb.txt
           python3 - <<'PY'
           import json
           from pathlib import Path

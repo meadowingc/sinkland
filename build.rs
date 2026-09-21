@@ -91,31 +91,6 @@ SINKLAND_FRIENDS='[]'
         }
     }
 
-    // Download Kagi small web list
-    let smallweb_file = "assets/smallweb.txt";
-    if !Path::new(smallweb_file).exists() {
-        println!("cargo:warning=Downloading Kagi small web list...");
-
-        match reqwest::blocking::get(
-            "https://raw.githubusercontent.com/kagisearch/smallweb/refs/heads/main/smallweb.txt",
-        )
-        .and_then(|response| response.error_for_status())
-        {
-            Ok(response) => match response.text() {
-                Ok(content) => {
-                    fs::write(smallweb_file, &content).expect("Failed to write smallweb.txt");
-                    let count = content
-                        .lines()
-                        .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
-                        .count();
-                    println!("cargo:warning=Downloaded {} small web sites", count);
-                }
-                Err(e) => println!("cargo:warning=Failed to read smallweb response: {}", e),
-            },
-            Err(e) => println!("cargo:warning=Failed to download smallweb list: {}", e),
-        }
-    }
-
     // Tell Cargo to rerun this build script only if build.rs changes
     println!("cargo:rerun-if-changed=build.rs");
 }

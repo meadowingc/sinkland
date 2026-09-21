@@ -6,6 +6,12 @@ A playground of different traps for AI bots and scrapers. Generates an endless
 maze of book excerpts, haikus, fictional social profiles, and procedural images.
 Pages are generated on demand, not stored in a database.
 
+Generated links stay inside Sinkland unless you configure friend traps through
+`SINKLAND_FRIENDS`. When friends are configured, approximately 25% of generated
+blog links point to them and 75% stay internal; without friends, all stay internal.
+Only add trap sites whose operators have agreed to receive crawler traffic.
+Sinkland does not mix unrelated real sites into its generated links.
+
 ## Local development
 
 ```bash
@@ -16,10 +22,10 @@ Visit `http://localhost:43796/`, `/blog/anything`, `/haiku/anything`, or `/socia
 The default listener is `0.0.0.0:43796`; set `SINKLAND_BIND=127.0.0.1:43796` to
 listen only on loopback. This setting accepts an IP address and port, not a hostname.
 
-The first build downloads books from Project Gutenberg, a haiku dataset, blog
-posts, and the Kagi small web list into `assets/`. Run the executable from a
-directory containing `assets/`, `templates/`, and `static/`. An optional `.env`
-file can set `SINKLAND_FRIENDS` to a JSON array of URLs.
+The first build downloads books from Project Gutenberg, a haiku dataset, and blog
+posts into `assets/`. Run the executable from a directory containing `assets/`,
+`templates/`, and `static/`. An optional `.env` file can set `SINKLAND_FRIENDS` to a
+JSON array of URLs.
 
 ## Raspberry Pi releases (GitHub mirror)
 

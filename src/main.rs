@@ -1,7 +1,7 @@
 mod data;
 mod generators;
 
-use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA, SMALLWEB_LIST};
+use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA};
 use generators::images::{
     generate_avatar_from_seed, generate_banner_from_seed, generate_image_from_seed,
 };
@@ -187,7 +187,7 @@ fn add_inline_links_to_paragraphs(paragraphs: Vec<String>) -> Vec<String> {
 
             selected_positions.sort();
 
-            let links = generate_random_links(selected_positions.len());
+            let links = generate_random_links(selected_positions.len(), &FRIENDS_LIST, &mut rng);
 
             let mut result = String::new();
             let mut link_index = 0;
@@ -233,15 +233,16 @@ fn extract_word_and_punctuation(word: &str) -> (String, String) {
     (clean_word, punctuation)
 }
 
-fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
-    let mut rng = rand::thread_rng();
+fn generate_random_links<R: Rng>(
+    num_links: usize,
+    friends: &[String],
+    rng: &mut R,
+) -> Vec<(String, String)> {
     let num_links = num_links.min(BOOK_DATA.titles.len());
-    let friends = &*FRIENDS_LIST;
-    let smallweb = &*SMALLWEB_LIST;
 
     BOOK_DATA
         .titles
-        .choose_multiple(&mut rng, num_links)
+        .choose_multiple(rng, num_links)
         .map(|link_title| {
             let random_timestamp = rng.gen_range(
                 0..std::time::SystemTime::now()
@@ -256,14 +257,7 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
             let month = (day_of_year / 30).min(11) + 1;
             let day = (day_of_year % 30) + 1;
 
-            // Decide link type: ~10% legitimate smallweb, ~25% friend trap, ~65% internal trap
-            let roll: f64 = rng.gen_range(0.0..1.0);
-
-            if !smallweb.is_empty() && roll < 0.10 {
-                // Legitimate link to a small web site (just the homepage)
-                let site = smallweb.choose(&mut rng).unwrap();
-                (link_title.clone(), site.clone())
-            } else if !friends.is_empty() && roll < 0.35 {
+            if !friends.is_empty() && rng.gen_bool(0.25) {
                 // Friend trap link with generated path
                 let clean_slug: String = link_title
                     .to_lowercase()
@@ -275,7 +269,7 @@ fn generate_random_links(num_links: usize) -> Vec<(String, String)> {
                     .collect::<Vec<_>>()
                     .join("-");
 
-                let friend_url = friends.choose(&mut rng).unwrap();
+                let friend_url = friends.choose(rng).unwrap();
                 let external_url = format!(
                     "{}/{:04}-{:02}-{:02}--{}/",
                     friend_url.trim_end_matches('/'),
@@ -419,7 +413,7 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
     };
 
     let num_links = rng.gen_range(2..=7);
-    let links = generate_random_links(num_links);
+    let links = generate_random_links(num_links, &FRIENDS_LIST, &mut rng);
 
     let mut context = Context::new();
     context.insert("title", &title);
@@ -445,7 +439,7 @@ fn index() -> Result<Html<String>, poem::Error> {
     let paragraphs = add_inline_links_to_paragraphs(paragraphs);
 
     let num_links = rng.gen_range(5..=10);
-    let links = generate_random_links(num_links);
+    let links = generate_random_links(num_links, &FRIENDS_LIST, &mut rng);
 
     let num_haiku_links = rng.gen_range(3..=5);
     let haiku_links = generate_haiku_links(num_haiku_links);
@@ -761,4 +755,51 @@ async fn main() -> Result<(), std::io::Error> {
     Server::new(TcpListener::bind(bind_address))
         .run(app)
         .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::{SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn links_without_friends_stay_inside_the_trap() {
+        let mut rng = StdRng::seed_from_u64(42);
+        for _ in 0..100 {
+            let links = generate_random_links(32, &[], &mut rng);
+            assert!(!links.is_empty());
+            assert!(links.iter().all(|(_, url)| url.starts_with("/blog/")));
+        }
+        assert!(generate_random_links(0, &[], &mut rng).is_empty());
+    }
+
+    #[test]
+    fn external_links_only_use_configured_friends() {
+        let friends = vec![
+            "https://first.example/trap/".to_string(),
+            "https://second.example/trap".to_string(),
+        ];
+        let mut rng = StdRng::seed_from_u64(42);
+        let mut total = 0;
+        let mut friend_counts = [0, 0];
+        for _ in 0..100 {
+            for (_, url) in generate_random_links(32, &friends, &mut rng) {
+                total += 1;
+                if url.starts_with("/blog/") {
+                    continue;
+                }
+                let friend = friends
+                    .iter()
+                    .position(|base| url.starts_with(&format!("{}/", base.trim_end_matches('/'))))
+                    .expect("External links must point to a configured friend trap");
+                friend_counts[friend] += 1;
+                assert!(url.contains("--"));
+                assert!(url.ends_with('/'));
+                assert!(!url.contains("/trap//"));
+            }
+        }
+        assert!(friend_counts.iter().all(|count| *count > 0));
+        let friend_fraction = friend_counts.iter().sum::<usize>() as f64 / total as f64;
+        assert!((0.20..0.30).contains(&friend_fraction));
+    }
 }

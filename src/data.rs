@@ -26,47 +26,6 @@ pub static FRIENDS_LIST: Lazy<Vec<String>> = Lazy::new(|| {
     }
 });
 
-// Kagi small web list - legitimate sites to link to occasionally
-// We extract hostnames from RSS feed URLs and keep ~2000 random entries
-pub static SMALLWEB_LIST: Lazy<Vec<String>> = Lazy::new(|| {
-    use rand::seq::SliceRandom;
-    use std::collections::HashSet;
-
-    let smallweb_file = "assets/smallweb.txt";
-    match std::fs::read_to_string(smallweb_file) {
-        Ok(content) => {
-            let mut urls: Vec<&str> = content
-                .lines()
-                .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
-                .map(|l| l.trim())
-                .collect();
-
-            let mut rng = rand::thread_rng();
-            urls.shuffle(&mut rng);
-
-            // Take 2500 to account for potential duplicate hostnames
-            urls.into_iter()
-                .take(2500)
-                .filter_map(|url| {
-                    if let Some(rest) = url.strip_prefix("https://") {
-                        rest.split('/').next().map(|h| format!("https://{}", h))
-                    } else if let Some(rest) = url.strip_prefix("http://") {
-                        rest.split('/').next().map(|h| format!("http://{}", h))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .collect()
-        }
-        Err(_) => {
-            eprintln!("Warning: Could not read smallweb.txt");
-            Vec::new()
-        }
-    }
-});
-
 // Haiku data structure
 #[derive(Deserialize)]
 pub struct HaikuData {
