@@ -24,6 +24,9 @@ Requires 64-bit ARM Linux, systemd, and an already installed cloudflared.
   --token-file PATH  Read the tunnel token from a file (never pass the token itself).
                      First install prompts privately if this option is omitted.
                      Updates reuse the saved token.
+  --cloudflared PATH Real cloudflared executable to copy for the service.
+                     For mise: --cloudflared "$(mise which cloudflared)"
+                     Default: sudo's PATH, then the previously installed copy.
   --version TAG      Install a specific vX.Y.Z release instead of GitHub's latest.
   --help             Show this help.
 
@@ -172,16 +175,17 @@ EOF
 
 main() {
     local hostname="" token_file="" requested_version=latest token="" command unit
-    local metadata checksum expected release cloudflared_help
+    local metadata checksum expected release cloudflared_help cloudflared_source=""
     version="" previous="" work="" staging="" switched=false
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --hostname|--token-file|--version)
+            --hostname|--token-file|--version|--cloudflared)
                 [[ $# -ge 2 && -n $2 && $2 != --* ]] || die "Missing value for $1."
                 case "$1" in
                     --hostname) hostname=$2 ;;
                     --token-file) token_file=$2 ;;
                     --version) requested_version=$2 ;;
+                    --cloudflared) cloudflared_source=$2 ;;
                 esac
                 shift 2 ;;
             --help|-h) usage; return ;;
@@ -193,9 +197,20 @@ main() {
     for command in curl python3 tar sha256sum systemctl flock find install mktemp; do
         command -v "$command" > /dev/null || die "Install required command: $command"
     done
-    cloudflared=$(command -v cloudflared) || die "Install cloudflared first."
-    [[ $cloudflared =~ ^/[a-zA-Z0-9/_.-]+$ ]] || die "Unsupported cloudflared executable path."
-    cloudflared_help=$("$cloudflared" tunnel run --help)
+    cloudflared="$INSTALL_ROOT/bin/cloudflared"
+    if [[ -z $cloudflared_source ]]; then
+        cloudflared_source=$(command -v cloudflared || true)
+        if [[ -z $cloudflared_source && -x $cloudflared ]]; then
+            cloudflared_source=$cloudflared
+        fi
+    fi
+    [[ -n $cloudflared_source ]] ||
+        die "cloudflared is not in sudo PATH. Install it or pass --cloudflared \"\$(mise which cloudflared)\"."
+    [[ $cloudflared_source == /* && -f $cloudflared_source && -x $cloudflared_source ]] ||
+        die "cloudflared must be an absolute path to an executable file: $cloudflared_source"
+    [[ $cloudflared_source != */shims/* ]] ||
+        die "Pass the real executable, not a shim: --cloudflared \"\$(mise which cloudflared)\"."
+    cloudflared_help=$("$cloudflared_source" tunnel run --help)
     [[ $cloudflared_help == *--token-file* ]] ||
         die "Update cloudflared: --token-file requires version 2025.4.0 or newer."
     metadata=$(systemctl --version)
@@ -280,6 +295,10 @@ PY
         mv "$staging" "$release"
         staging=""
     fi
+    # A dynamic service user cannot access mise binaries inside a protected home.
+    install -d -m 755 "$INSTALL_ROOT/bin"
+    install -m 755 "$cloudflared_source" "$INSTALL_ROOT/bin/cloudflared.next"
+    mv -Tf "$INSTALL_ROOT/bin/cloudflared.next" "$cloudflared"
     if [[ ! -f "$CONFIG_DIR/sinkland.env" ]]; then
         printf 'SINKLAND_FRIENDS=[]\n' > "$CONFIG_DIR/sinkland.env"
     fi

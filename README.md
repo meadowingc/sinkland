@@ -91,6 +91,21 @@ From a checkout of this repository on the Pi:
 sudo bash scripts/install-pi.sh --hostname sinkland.meadow.cafe
 ```
 
+If `cloudflared` is installed through **mise**, resolve its real executable in your
+normal user shell, before sudo changes `PATH`:
+
+```bash
+sudo bash scripts/install-pi.sh \
+  --cloudflared "$(mise which cloudflared)" \
+  --hostname sinkland.meadow.cafe
+```
+
+You can also pass the absolute path to the binary directly. Do not pass a mise
+shim. The installer copies the executable to `/opt/sinkland/bin/cloudflared`, owned
+by root, so the service does not need mise or access to your home directory.
+`ProtectHome=yes` remains enabled. Without `--cloudflared`, the installer searches
+sudo's `PATH`, then reuses its existing service copy if no executable is found.
+
 Alternatively, download and inspect the standalone installer from the latest release:
 
 ```bash
@@ -113,7 +128,7 @@ installs its runtime files, and enables/starts two services:
 | Service | Purpose |
 | --- | --- |
 | `sinkland.service` | Runs Sinkland on `127.0.0.1:43796` |
-| `sinkland-cloudflared.service` | Runs a dedicated tunnel connector using the installed `cloudflared` |
+| `sinkland-cloudflared.service` | Runs a dedicated tunnel connector using `/opt/sinkland/bin/cloudflared` |
 
 An existing `cloudflared.service` is **not modified or stopped**. If it already
 serves other applications, those stay independent. Avoid running two connectors
@@ -140,8 +155,10 @@ sudo bash install-pi.sh
 Updates reuse the stored token and hostname, preserve
 `/etc/sinkland/sinkland.env`, and briefly restart both services. Obtain a newer
 installer from the repository/release when its deployment logic changes.
-There is no unattended update timer. `cloudflared` itself is not installed or
-updated by this script; keep it updated separately through your package manager.
+There is no unattended update timer. The installer does not download `cloudflared`;
+update it through mise or your package manager, then rerun the installer to refresh
+the service copy. For mise, pass `--cloudflared "$(mise which cloudflared)"` again
+to select the updated binary; otherwise an update may reuse the old service copy.
 
 Optional friends configuration uses systemd EnvironmentFile syntax:
 

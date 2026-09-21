@@ -123,6 +123,9 @@ class InstallerTests(unittest.TestCase):
             f"UNIT_DIR={shlex.quote(str(self.units))}",
             f"LOCK_FILE={shlex.quote(str(self.root / 'lock'))}",
             "require_root() { :; }",
+            # Model sudo's PATH without relying on whether the test host has cloudflared.
+            'command() { if [[ ${HIDE_CLOUDFLARED:-} == 1 && $* == "-v cloudflared" ]]; '
+            'then return 1; else builtin command "$@"; fi; }',
             'main "$@"',
         ])
         result = subprocess.run(
@@ -163,6 +166,54 @@ class InstallerTests(unittest.TestCase):
             self.assertNotIn("MemoryMax", unit)
         self.assertIn("LoadCredential=tunnel-token:", (self.units / "sinkland-cloudflared.service").read_text())
         self.assertFalse((self.units / "cloudflared.service").exists())
+        self.assertIn(
+            f"ExecStart={self.install_root}/bin/cloudflared ",
+            (self.units / "sinkland-cloudflared.service").read_text(),
+        )
+        self.assertEqual((self.install_root / "bin" / "cloudflared").stat().st_mode & 0o777, 0o755)
+
+    def test_mise_binary_is_copied_outside_home_and_reused(self):
+        source = self.root / "home" / "a user" / ".local/share/mise/installs/cloudflared/2026.2.0/cloudflared"
+        source.parent.mkdir(parents=True)
+        source.write_bytes((self.root / "bin" / "cloudflared").read_bytes())
+        source.chmod(0o755)
+        self.run_installer(
+            "--cloudflared", str(source), "--token-file", str(self.token_file),
+            extra_env={"HIDE_CLOUDFLARED": "1"},
+        )
+        installed = self.install_root / "bin" / "cloudflared"
+        self.assertEqual(installed.read_bytes(), source.read_bytes())
+        self.assertFalse(installed.is_symlink())
+        unit = (self.units / "sinkland-cloudflared.service").read_text()
+        self.assertNotIn(str(source), unit)
+        self.assertIn("ProtectHome=yes", unit)
+        source.unlink()
+        self.run_installer(extra_env={"HIDE_CLOUDFLARED": "1"})
+
+    def test_explicit_cloudflared_refreshes_service_copy(self):
+        self.first_install()
+        source = self.root / "bin" / "cloudflared"
+        source.write_text(source.read_text() + "\n# Updated executable\n")
+        self.run_installer("--cloudflared", str(source))
+        self.assertEqual((self.install_root / "bin" / "cloudflared").read_bytes(), source.read_bytes())
+
+    def test_missing_cloudflared_has_mise_instructions(self):
+        output = self.first_install(extra_env={"HIDE_CLOUDFLARED": "1"}, success=False)
+        self.assertIn('mise which cloudflared', output)
+        self.assertFalse(self.install_root.exists())
+
+    def test_bad_explicit_cloudflared_does_not_fall_back(self):
+        for source in ("relative/cloudflared", str(self.root / "missing")):
+            with self.subTest(source=source):
+                output = self.run_installer("--cloudflared", source, success=False)
+                self.assertIn("absolute path to an executable file", output)
+        shim = self.root / "shims" / "cloudflared"
+        shim.parent.mkdir()
+        shim.write_text("#!/bin/sh\nexit 99\n")
+        shim.chmod(0o755)
+        self.assertIn(
+            "not a shim", self.run_installer("--cloudflared", str(shim), success=False),
+        )
 
     def test_update_and_explicit_version(self):
         self.first_install()
