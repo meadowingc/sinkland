@@ -1,0 +1,107 @@
+name: Raspberry Pi release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing mirrored release tag (for example v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: raspberry-pi-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Validate release tag
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "Use a stable version tag such as v0.1.0." >&2
+            exit 1
+          }
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends musl-tools pkg-config libssl-dev shellcheck
+          rustup toolchain install stable --profile minimal
+          rustup target add --toolchain stable aarch64-unknown-linux-musl
+      - name: Check installer
+        run: |
+          bash -n scripts/install-pi.sh
+          shellcheck scripts/install-pi.sh
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Build static ARM64 binary
+        run: cargo +stable build --locked --release --target aarch64-unknown-linux-musl
+      - name: Package runtime files
+        run: |
+          mkdir -p package dist
+          install -m 755 target/aarch64-unknown-linux-musl/release/sinkland package/sinkland
+          cp -R assets templates static package/
+          printf '%s\n' "$RELEASE_TAG" > package/VERSION
+          test -s package/assets/smallweb.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          assets = Path("package/assets")
+          haikus = json.loads((assets / "haikus.json").read_text())
+          assert haikus["lines_5"] and haikus["lines_7"], "Missing haiku data"
+          for name in ("jekyll_hyde", "pride_prejudice", "dracula", "frankenstein", "christmas_carol"):
+              assert "*** START OF" in (assets / "books" / f"{name}.txt").read_text(), name
+          PY
+          # Ensure the artifact does not depend on the runner's newer glibc.
+          if readelf -l package/sinkland | grep -q INTERP; then
+            echo "Expected a static executable." >&2
+            exit 1
+          fi
+      - name: Smoke test the packaged application
+        working-directory: package
+        env:
+          SINKLAND_BIND: 127.0.0.1:43796
+          SINKLAND_FRIENDS: "[]"
+        run: |
+          ./sinkland > ../smoke.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid"; wait "$pid" || true' EXIT
+          ready=false
+          for _attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:43796/ > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != true ]]; then
+            cat ../smoke.log
+            exit 1
+          fi
+          for path in blog/check haiku/check social social/user/check social/post/check social/media/check.png social/avatar/check.png social/banner/check.png static/hi.txt; do
+            curl --fail --silent --show-error "http://127.0.0.1:43796/$path" > /dev/null
+          done
+      - name: Publish release
+        run: |
+          tar -C package -czf dist/sinkland-linux-arm64.tar.gz .
+          (cd dist && sha256sum sinkland-linux-arm64.tar.gz > sinkland-linux-arm64.tar.gz.sha256)
+          cp scripts/install-pi.sh dist/
+          gh release create "$RELEASE_TAG" dist/* --verify-tag --draft \
+            --title "Sinkland $RELEASE_TAG" \
+            --notes "ARM64 Linux release for Raspberry Pi 3 and newer running a 64-bit OS. Includes a static executable and all runtime assets. See README.md for installation."
+          gh release edit "$RELEASE_TAG" --draft=false --latest

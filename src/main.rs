@@ -719,9 +719,17 @@ async fn main() -> Result<(), std::io::Error> {
         .at("/social/avatar/:username", get(social_avatar))
         .at("/social/banner/:username", get(social_banner));
 
-    const PORT: u16 = 43796;
+    let bind_address = match std::env::var("SINKLAND_BIND") {
+        Ok(address) => address,
+        Err(std::env::VarError::NotPresent) => "0.0.0.0:43796".to_string(),
+        Err(error) => {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, error));
+        }
+    }
+    .parse::<std::net::SocketAddr>()
+    .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
 
-    println!("Starting server on http://localhost:{}", PORT);
+    println!("Starting server on http://{}", bind_address);
     println!(
         "Loaded {} titles and {} sentences from books",
         BOOK_DATA.titles.len(),
@@ -750,7 +758,7 @@ async fn main() -> Result<(), std::io::Error> {
         memory_usage
     );
 
-    Server::new(TcpListener::bind(&format!("0.0.0.0:{}", PORT)))
+    Server::new(TcpListener::bind(bind_address))
         .run(app)
         .await
 }

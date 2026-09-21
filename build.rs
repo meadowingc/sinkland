@@ -58,6 +58,7 @@ SINKLAND_FRIENDS='[]'
             println!("cargo:warning=Downloading {}...", title);
 
             let response = reqwest::blocking::get(*url)
+                .and_then(|response| response.error_for_status())
                 .unwrap_or_else(|_| panic!("Failed to download {}", title));
 
             let content = response.text().expect("Failed to read response");
@@ -97,7 +98,9 @@ SINKLAND_FRIENDS='[]'
 
         match reqwest::blocking::get(
             "https://raw.githubusercontent.com/kagisearch/smallweb/refs/heads/main/smallweb.txt",
-        ) {
+        )
+        .and_then(|response| response.error_for_status())
+        {
             Ok(response) => match response.text() {
                 Ok(content) => {
                     fs::write(smallweb_file, &content).expect("Failed to write smallweb.txt");
@@ -118,7 +121,7 @@ SINKLAND_FRIENDS='[]'
 }
 
 fn download_rss_feed(url: &str, output_file: &str) -> Result<usize, Box<dyn std::error::Error>> {
-    let response = reqwest::blocking::get(url)?;
+    let response = reqwest::blocking::get(url)?.error_for_status()?;
     let content = response.bytes()?;
     let channel = rss::Channel::read_from(&content[..])?;
 
@@ -220,7 +223,7 @@ fn download_haikus(output_file: &str) -> Result<usize, Box<dyn std::error::Error
     let parquet_path = "assets/haiku_temp.parquet";
 
     println!("cargo:warning=Downloading full haiku parquet file...");
-    let response = reqwest::blocking::get(parquet_url)?;
+    let response = reqwest::blocking::get(parquet_url)?.error_for_status()?;
     let bytes = response.bytes()?;
     fs::write(parquet_path, bytes)?;
 
