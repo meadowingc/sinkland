@@ -25,14 +25,6 @@ pub static MODEL: Lazy<TextModel> = Lazy::new(|| {
     );
     model
 });
-pub static SOURCES: Lazy<serde_json::Value> = Lazy::new(|| {
-    serde_json::from_str(include_str!(concat!(
-        env!("OUT_DIR"),
-        "/paper-provenance.json"
-    )))
-    .expect("Compiled paper provenance is invalid")
-});
-
 pub fn category_name(category: &str) -> &'static str {
     match category {
         "cs" => "Computer science",
@@ -277,36 +269,120 @@ pub struct Metadata {
 
 pub fn metadata(id: &PaperId) -> Metadata {
     let mut rng = rng(&format!("{id}:metadata"));
-    let methods = [
-        "A Bayesian perspective on",
-        "Measuring",
-        "Towards a unified theory of",
-        "A controlled study of",
-        "Unexpected regularities in",
-        "A robust model of",
-    ];
-    let endings = [
-        "under distributional constraints",
-        "with imperfect observations",
-        "at the edge of convergence",
-        "in a synthetic population",
-        "with comparative baselines",
+    let topic = TOPICS[id.category][id.topic];
+    let learned_phrase = academic_phrase(id.category, &mut rng);
+    let qualifiers = [
+        "under distribution shift",
+        "with incomplete observations",
+        "across heterogeneous regimes",
+        "under finite-sample constraints",
+        "in high-dimensional settings",
         "with limited supervision",
+        "under temporal dependence",
+        "across multiple operating conditions",
     ];
+    let qualifier = qualifiers.choose(&mut rng).unwrap();
+    let title = match rng.gen_range(0..14) {
+        0 => format!("A comparative analysis of {topic} {qualifier}"),
+        1 => format!("{topic}: {learned_phrase}"),
+        2 => format!("On the stability of {topic} {qualifier}"),
+        3 => format!("Estimating {topic}: {learned_phrase}"),
+        4 => format!("When does {topic} generalize? {learned_phrase}"),
+        5 => format!("Characterizing {topic} {qualifier}"),
+        6 => format!("Learning representations for {topic}: {learned_phrase}"),
+        7 => format!("The structure of {topic}: {learned_phrase}"),
+        8 => format!("Robust inference for {topic} {qualifier}"),
+        9 => format!("Revisiting {topic}: {learned_phrase}"),
+        10 => format!("Scaling laws for {topic} {qualifier}"),
+        11 => format!("An empirical account of {topic}: {learned_phrase}"),
+        12 => format!("Towards a unified account of {topic} {qualifier}"),
+        _ => format!("{topic} beyond standard assumptions: {learned_phrase}"),
+    };
     Metadata {
         id: id.to_string(),
-        title: format!(
-            "{} {} {}",
-            methods.choose(&mut rng).unwrap(),
-            TOPICS[id.category][id.topic],
-            endings.choose(&mut rng).unwrap()
-        ),
+        title: capitalize_title(&title),
         category: CATEGORIES[id.category].to_owned(),
         category_name: category_name(CATEGORIES[id.category]).to_owned(),
-        topic: TOPICS[id.category][id.topic].to_owned(),
+        topic: topic.to_owned(),
         authors: authors(id),
         year: rng.gen_range(1990..=2026),
     }
+}
+
+fn academic_phrase(category: usize, rng: &mut impl Rng) -> String {
+    let model = &MODEL.categories[CATEGORIES[category]];
+    let unsuitable = [
+        "we",
+        "our",
+        "this",
+        "paper",
+        "article",
+        "section",
+        "figure",
+        "table",
+        "appendix",
+        "here",
+        "show",
+        "shows",
+        "shown",
+        "present",
+        "presented",
+        "propose",
+        "proposed",
+        "introduce",
+        "introduced",
+        "conclude",
+        "discussion",
+        "results",
+    ];
+    for _ in 0..24 {
+        let mut tokens = model::words(model.starts.choose(rng).expect("Validated starts"));
+        let target = rng.gen_range(4..=7);
+        while tokens.len() < target {
+            let key = tokens[tokens.len() - 2..].join(" ");
+            let Some(options) = model.transitions.get(&key) else {
+                break;
+            };
+            let total: u64 = options.iter().map(|(_, count)| *count as u64).sum();
+            let mut choice = rng.gen_range(0..total);
+            let mut next = None;
+            for (word, weight) in options {
+                if choice < *weight as u64 {
+                    next = Some(word.clone());
+                    break;
+                }
+                choice -= *weight as u64;
+            }
+            let Some(next) = next else { break };
+            tokens.push(next);
+        }
+        tokens.truncate(target);
+        if tokens.len() >= 4
+            && tokens
+                .iter()
+                .all(|word| !unsuitable.contains(&word.as_str()))
+        {
+            return capitalize_title(&tokens.join(" "));
+        }
+    }
+    "Structured Comparative Evidence".to_owned()
+}
+
+fn capitalize_title(value: &str) -> String {
+    let mut chars = value.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        None => String::new(),
+    }
+}
+
+pub fn random_metadata(rng: &mut impl Rng) -> Metadata {
+    metadata(&PaperId {
+        category: rng.gen_range(0..CATEGORIES.len()),
+        author: rng.r#gen(),
+        topic: rng.gen_range(0..6),
+        nonce: rng.r#gen(),
+    })
 }
 
 #[derive(Debug, Serialize)]
@@ -480,18 +556,111 @@ pub struct Series {
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct Experiment {
     pub title: String,
+    pub context: String,
     pub unit: String,
     pub series: Vec<Series>,
+}
+
+fn configuration_names(id: &PaperId) -> Vec<String> {
+    let mut rng = rng(&format!("{id}:design"));
+    let subject = [
+        [
+            "quorum",
+            "scheduler",
+            "protocol",
+            "replica",
+            "topology",
+            "estimator",
+        ],
+        [
+            "operator",
+            "manifold",
+            "boundary",
+            "kernel",
+            "embedding",
+            "trajectory",
+        ],
+        [
+            "field",
+            "ensemble",
+            "lattice",
+            "spectrum",
+            "interaction",
+            "state",
+        ],
+        [
+            "cohort",
+            "estimator",
+            "prior",
+            "sample",
+            "model",
+            "calibration",
+        ],
+        [
+            "population",
+            "lineage",
+            "community",
+            "phenotype",
+            "network",
+            "response",
+        ],
+        [
+            "portfolio",
+            "factor",
+            "liquidity",
+            "exposure",
+            "market",
+            "allocation",
+        ],
+        [
+            "allocation",
+            "region",
+            "market",
+            "policy",
+            "household",
+            "equilibrium",
+        ],
+        [
+            "controller",
+            "sensor",
+            "channel",
+            "filter",
+            "network",
+            "signal",
+        ],
+    ][id.category][id.topic];
+    let prefixes = [
+        "Static",
+        "Adaptive",
+        "Regularized",
+        "Hierarchical",
+        "Constrained",
+        "Distributed",
+        "Calibrated",
+        "Sparse",
+        "Dynamic",
+        "Reference",
+        "Coupled",
+        "Stochastic",
+    ];
+    let group_count = rng.gen_range(3..=5);
+    let mut names = prefixes
+        .choose_multiple(&mut rng, group_count)
+        .map(|prefix| format!("{prefix} {subject}"))
+        .collect::<Vec<_>>();
+    names.shuffle(&mut rng);
+    names
 }
 
 pub fn experiment(id: &PaperId, index: usize) -> Experiment {
     let mut rng = rng(&format!("{id}:experiment:{index}"));
     let n = rng.gen_range(24..=72);
-    let series = ["Baseline", "Proposed method", "Reference control"]
+    let names = configuration_names(id);
+    let series = names
         .iter()
         .enumerate()
         .map(|(group, name)| {
-            let offset = rng.gen_range(10.0..35.0) + group as f64 * 5.0;
+            let offset = rng.gen_range(10.0..35.0) + group as f64 * rng.gen_range(2.5..6.5);
             let slope = rng.gen_range(-0.08..0.18);
             let values: Vec<f64> = (0..n)
                 .map(|x| {
@@ -502,30 +671,37 @@ pub fn experiment(id: &PaperId, index: usize) -> Experiment {
                 })
                 .collect();
             Series {
-                name: name.to_string(),
+                name: name.clone(),
                 summary: summarize(&values),
                 values,
             }
         })
         .collect();
+    let contexts = [
+        "out-of-sample evaluation",
+        "controlled perturbation study",
+        "sensitivity analysis",
+        "temporal replication",
+        "cross-regime comparison",
+        "parameter stability assessment",
+        "high-noise evaluation",
+        "ablation study",
+    ];
+    let context = contexts.choose(&mut rng).unwrap().to_string();
+    let measures = [
+        "normalized response",
+        "estimated effect",
+        "relative efficiency",
+        "prediction score",
+        "stability index",
+        "aggregate intensity",
+        "scaled deviation",
+        "performance coefficient",
+    ];
     Experiment {
-        title: format!(
-            "Experiment {}: {}",
-            index + 1,
-            [
-                "robustness under perturbation",
-                "comparative response",
-                "sensitivity to measurement noise",
-                "replication under uncertainty"
-            ][index % 4]
-        ),
-        unit: [
-            "response units",
-            "relative intensity",
-            "normalized response",
-            "coordination units",
-        ][id.topic % 4]
-            .to_owned(),
+        title: format!("Experiment {}: {context}", index + 1),
+        context,
+        unit: measures.choose(&mut rng).unwrap().to_string(),
         series,
     }
 }
@@ -540,8 +716,11 @@ pub struct Table {
 pub fn tables(data: &Experiment) -> Vec<Table> {
     vec![
         Table {
-            caption: format!("{} — descriptive statistics", data.title),
-            headers: ["Group", "n", "Mean", "Sample SD", "Min", "Max"]
+            caption: format!(
+                "Summary of {} across the {} configurations",
+                data.unit, data.context
+            ),
+            headers: ["Configuration", "n", "Mean", "Sample SD", "Min", "Max"]
                 .map(str::to_owned)
                 .to_vec(),
             rows: data
@@ -561,9 +740,9 @@ pub fn tables(data: &Experiment) -> Vec<Table> {
                 .collect(),
         },
         Table {
-            caption: format!("{} — quantiles and uncertainty", data.title),
+            caption: format!("Distributional estimates for the {}", data.context),
             headers: [
-                "Group",
+                "Configuration",
                 "Q1",
                 "Median",
                 "Q3",
@@ -604,18 +783,66 @@ pub fn figure_count(id: &PaperId) -> usize {
 }
 
 pub fn figure(id: &PaperId, index: usize) -> Figure {
-    let offset = rng(&format!("{id}:charts")).gen_range(0..charts::NAMES.len());
-    let kind = (offset + index) % charts::NAMES.len();
+    let mut chart_rng = rng(&format!("{id}:charts"));
+    let mut kinds = (0..charts::NAMES.len()).collect::<Vec<_>>();
+    kinds.shuffle(&mut chart_rng);
+    let kind = kinds[index % kinds.len()];
+    let data = experiment(id, index);
+    let first = &data.series[0].name;
+    let second = &data.series[1].name;
+    let caption = match kind {
+        0 => format!(
+            "Observed trajectories for {first}, {second}, and the remaining configurations during the {}.",
+            data.context
+        ),
+        1 => format!(
+            "Observation-level variation in {} across all configurations during the {}.",
+            data.unit, data.context
+        ),
+        2 => format!(
+            "Mean {} by configuration; differences are computed from the shared observation series.",
+            data.unit
+        ),
+        3 => format!(
+            "Empirical distribution of {} for {}, shown across equal-width intervals.",
+            data.unit, second
+        ),
+        4 => format!(
+            "Median, interquartile range, and observed extent of {} for each configuration.",
+            data.unit
+        ),
+        5 => format!(
+            "Observation-by-configuration intensity map for the {}; color denotes {}.",
+            data.context, data.unit
+        ),
+        6 => format!(
+            "Configuration means and normal-approximation intervals for {}.",
+            data.unit
+        ),
+        7 => format!(
+            "Cumulative contribution of each configuration to {} over the observation sequence.",
+            data.unit
+        ),
+        8 => format!(
+            "Kernel-smoothed distribution profiles of {} across configurations.",
+            data.unit
+        ),
+        9 => format!(
+            "Sequential changes in mean {} relative to {}; each bar shows the incremental difference associated with the next configuration.",
+            data.unit, first
+        ),
+        10 => format!(
+            "Parallel-coordinate profile of location, dispersion, range, and uncertainty for each configuration.",
+        ),
+        _ => format!(
+            "Multivariate projection comparing paired configuration responses; marker area encodes a third response dimension.",
+        ),
+    };
     Figure {
         index,
         kind,
         name: charts::NAMES[kind].to_owned(),
-        caption: format!(
-            "Figure {}. {} for experiment {}.",
-            index + 1,
-            charts::NAMES[kind],
-            index + 1
-        ),
+        caption: format!("Figure {}. {caption}", index + 1),
     }
 }
 
@@ -643,7 +870,7 @@ pub fn generate(id: &PaperId) -> Paper {
         title: "1. Introduction".to_owned(),
         paragraphs: vec![
             format!(
-                "We investigate {} through a synthetic study.",
+                "We investigate {} through a comparative empirical study.",
                 metadata.topic
             ),
             sentence(id.category, &mut text_rng),
@@ -654,15 +881,21 @@ pub fn generate(id: &PaperId) -> Paper {
     };
     let methods = Section {
         title: "2. Methods".to_owned(),
-        paragraphs: vec!["We compare a baseline, a proposed method, and a reference control using reproducible simulated observations. Means, sample standard deviations and linearly interpolated quantiles are calculated from those observations. Error bars show the illustrative normal-approximation interval mean ± 1.96 × sample SD / √n; serial dependence in these simulations means it should not be interpreted as a calibrated inferential guarantee.".to_owned(),
-            sentence(id.category, &mut text_rng)],
-        tables: vec![], figure: None,
+        paragraphs: vec![
+            format!(
+                "We compare {} configurations using a common observation protocol. Means, sample standard deviations and linearly interpolated quantiles are calculated from the recorded series. Error bars show the normal-approximation interval mean ± 1.96 × sample SD / √n.",
+                experiment(id, 0).series.len()
+            ),
+            sentence(id.category, &mut text_rng),
+        ],
+        tables: vec![],
+        figure: None,
     };
     let mut sections = vec![introduction, methods];
     for index in 0..figure_count(id) {
         let data = experiment(id, index);
         let paragraph = format!(
-            "In {}, {} has a mean of {:.2} {} (n = {}), compared with {:.2} for {}. The reported values, tables and figure all use the same generated observations.",
+            "In {}, {} has a mean of {:.2} {} (n = {}), compared with {:.2} for {}. The reported values, tables and figure are derived from the same observation series.",
             data.title.to_lowercase(),
             data.series[1].name,
             data.series[1].summary.mean,
@@ -681,12 +914,12 @@ pub fn generate(id: &PaperId) -> Paper {
     sections.push(Section {
         title: "4. Discussion and limitations".to_owned(),
         paragraphs: vec![sentence(id.category, &mut text_rng),
-            "The analysis is limited to three simulated comparison groups. Its assumptions have not been validated against empirical measurements, and the generated results do not support real-world inferences.".to_owned()],
+            "The observed differences remain sensitive to model specification, dependence across measurements, and the finite range of operating conditions considered here.".to_owned()],
         tables: vec![], figure: None,
     });
     sections.push(Section {
         title: "5. Conclusion".to_owned(),
-        paragraphs: vec![format!("Our exploration of {} invites further synthetic investigation.", metadata.topic)],
+        paragraphs: vec![format!("Our analysis of {} identifies a consistent pattern across the evaluated configurations and motivates further investigation under broader operating conditions.", metadata.topic)],
         tables: vec![], figure: None,
     });
     let mut ref_rng = rng(&format!("{id}:references"));
@@ -715,7 +948,7 @@ pub fn generate(id: &PaperId) -> Paper {
     .collect();
     Paper {
         abstract_text: format!(
-            "This procedural study examines {} across {} synthetic experiments. We compare reproducible groups, quantify their variability, and evaluate differences in response under the specified simulation assumptions.",
+            "This study examines {} across {} experiments. We compare multiple configurations, quantify their variability, and evaluate differences in response under the specified operating assumptions.",
             metadata.topic,
             figure_count(id)
         ),
@@ -812,8 +1045,15 @@ mod tests {
     fn figures_and_tables_follow_the_document() {
         let mut counts = BTreeSet::new();
         let mut kinds = BTreeSet::new();
+        let mut captions = BTreeSet::new();
+        let mut configurations = BTreeSet::new();
         for nonce in 0..100 {
-            let id = id(nonce);
+            let id = PaperId {
+                category: nonce as usize % CATEGORIES.len(),
+                author: 12,
+                topic: nonce as usize / CATEGORIES.len() % 6,
+                nonce,
+            };
             let count = figure_count(&id);
             counts.insert(count);
             let paper = generate(&id);
@@ -834,7 +1074,29 @@ mod tests {
                 count * 2
             );
             for index in 0..count {
-                kinds.insert(figure(&id, index).kind);
+                let figure = figure(&id, index);
+                kinds.insert(figure.kind);
+                captions.insert(figure.caption);
+                let data = experiment(&id, index);
+                assert_eq!(
+                    data.series
+                        .iter()
+                        .map(|series| &series.name)
+                        .collect::<Vec<_>>(),
+                    experiment(&id, index + 1)
+                        .series
+                        .iter()
+                        .map(|series| &series.name)
+                        .collect::<Vec<_>>()
+                );
+                assert!((3..=5).contains(&data.series.len()));
+                assert!(data.series.iter().all(|series| {
+                    !matches!(
+                        series.name.as_str(),
+                        "Baseline" | "Proposed method" | "Reference control"
+                    )
+                }));
+                configurations.extend(data.series.into_iter().map(|series| series.name));
             }
             assert!(
                 paper
@@ -845,6 +1107,41 @@ mod tests {
         }
         assert_eq!(counts, (2..=10).collect());
         assert_eq!(kinds.len(), charts::NAMES.len());
+        assert!(captions.len() > 300);
+        assert!(configurations.len() > 100);
+    }
+
+    #[test]
+    fn titles_use_varied_forms_and_corpus_phrases() {
+        let mut titles = BTreeSet::new();
+        let mut openings = BTreeSet::new();
+        let mut towards = 0;
+        for nonce in 0..400 {
+            let title = metadata(&PaperId {
+                category: nonce as usize % CATEGORIES.len(),
+                author: 12,
+                topic: nonce as usize / CATEGORIES.len() % 6,
+                nonce,
+            })
+            .title;
+            let lower = title.to_lowercase();
+            assert!(!lower.contains("this section"));
+            assert!(!lower.contains("this paper"));
+            assert!(!lower.contains(" we "));
+            assert!(!lower.contains(" our "));
+            openings.insert(
+                title
+                    .split_whitespace()
+                    .take(4)
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            );
+            towards += usize::from(title.starts_with("Towards "));
+            titles.insert(title);
+        }
+        assert!(titles.len() > 390);
+        assert!(openings.len() > 100);
+        assert!(towards < 60);
     }
 
     #[test]

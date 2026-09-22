@@ -20,7 +20,6 @@ pub fn routes() -> Route {
         .at("/search", get(search))
         .at("/category/:category", get(category))
         .at("/author/:author_id", get(author))
-        .at("/sources", get(sources))
         .at("/p/:paper_id", get(paper))
         .at("/p/:paper_id/citation.bib", get(bibtex))
         .at("/p/:paper_id/figures/:index", get(figure))
@@ -206,13 +205,6 @@ async fn figure(Path((paper_id, index)): Path<(String, String)>) -> Result<Respo
         .body(svg))
 }
 
-#[handler]
-fn sources() -> Result<Html<String>, poem::Error> {
-    let mut context = Context::new();
-    context.insert("sources", &generator::SOURCES["papers"]);
-    render("papers/sources.html.tera", context)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -227,7 +219,6 @@ mod tests {
             "/search?q=learning",
             "/category/cs",
             "/author/0000000c",
-            "/sources",
             "/p/v1.cs.0000000c.3.000000000000000f",
             "/p/v1.cs.0000000c.3.000000000000000f/citation.bib",
             "/p/v1.cs.0000000c.3.000000000000000f/figures/0",
@@ -246,6 +237,8 @@ mod tests {
             "/author/xyz",
             "/p/nope",
             "/p/nope/citation.bib",
+            "/sources",
+            "/corpus-credits",
             "/p/v1.cs.0000000c.3.000000000000000f/figures/99",
         ] {
             assert_eq!(

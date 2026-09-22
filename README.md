@@ -40,7 +40,7 @@ statistics, references, and figures are repeatable when you revisit it. Seeded
 discovery pagination is repeatable too; submitting the search form again starts
 a new discovery. Author profiles have stable fictional identities and generate
 papers belonging to those authors. All fictional references stay inside the
-archive. Real source attribution appears separately at `/papers/sources`.
+archive.
 
 The archive uses neutral academic titles and institution names rather than
 scripted jokes. Each paper has **2–12 fictional authors**: familiar given names,
@@ -51,49 +51,65 @@ stay consistent across papers; profile listings generate papers with that author
 first rather than claiming to index all their collaborations.
 
 The **Cite this paper** panel provides a formatted citation and BibTeX with the
-complete ordered byline, plus a `.bib` download and permanent paper link. Both
-formats explicitly identify the manuscript as synthetic. Copy buttons use the
+complete ordered byline, plus a `.bib` download and permanent paper link. Copy buttons use the
 browser clipboard when permitted and offer manual selection otherwise; viewing
 and downloading citations also work without JavaScript.
 
 Figures include line plots, scatterplots, mean bars, histograms, box-and-whisker
-plots, measurement heatmaps, uncertainty intervals, and stacked areas. Tables
+plots, measurement heatmaps, uncertainty intervals, stacked areas, violin
+densities, waterfall charts, parallel-coordinate summaries, and multivariate
+bubble projections. Per-paper chart families are shuffled deterministically so
+short papers are not biased toward the first few types. Each paper uses only its
+generated **2–10 figure subset**; because there are twelve families, no paper
+contains every family and a family is not repeated within one paper. Figure/table captions,
+experiment contexts, units, and 3–5 configuration names are generated from each
+paper's stable identity rather than repeated global baseline labels. Tables
 come from each experiment section, without a separate table-count cap (a
 ten-experiment paper has twenty tables). Tables, numeric statements, and charts
 all derive from the same observations. The uncertainty bars use the documented
 normal approximation and are explicitly illustrative, not real evidence.
 
+Titles use fourteen structural forms and short category-conditioned phrases from
+the compiled transition model rather than a single repeated prefix. Blog related
+links and a subset of social posts also point to canonical papers within the
+archive.
+
 ### Build-time paper corpus
 
 Building now also requires **Python 3**. `build.rs` invokes
 `scripts/prepare-paper-corpus.py` to prepare a small, version-pinned selection of
-CC BY/CC0 arXiv papers from `corpus/papers/manifest.json`. HTML is the preferred
-source format; only explicitly selected PDF entries require `pdftotext` from
-`poppler-utils` on the build machine. No PDF tool is needed for the current
-HTML-only manifest.
+original-English public-domain scientific books from
+`corpus/papers/manifest.json`. The current set uses Project Gutenberg plain-text
+editions across computing history, mathematics, physics, statistics, biology,
+finance, economics, and electrical engineering. Every selected ebook is marked
+non-copyrighted by Project Gutenberg, and every author died by 1946—inside the
+manifest's conservative pre-1956 review cutoff.
 
 The first build fetches missing inputs sequentially with conservative pacing.
 Cleaned text is cached under `target/sinkland-paper-corpus/` and verified against
 reviewed SHA-256 checksums before use. A warm cache permits offline paper-corpus
 preparation; the existing books/haikus must also be present for an entirely
-offline build. Extraction excludes article metadata, bibliography, equations,
-figures, tables, scripts, and navigation.
+offline build. Extraction removes Project Gutenberg headers, license boilerplate,
+short headings, and other non-paragraph fragments before normalization. To avoid
+embedding entire books, it deterministically samples about 25,000 words across
+each work rather than taking only its opening chapters.
 
 Rust compiles sorted, category-specific word-transition maps and source-window
-fingerprints into `OUT_DIR`. The executable embeds the model and attribution,
-**not full academic source texts**. A twelve-word source-window guard reduces
-verbatim reproduction; it does not replace licenses or required attribution.
-Raw source HTML/PDF and extracted text are not included in release archives.
-The Pi needs no model downloads, arXiv access, Python, plotting service, or
-writable runtime cache to serve papers. Existing book/haiku packaging is unchanged.
+fingerprints into `OUT_DIR`. The executable embeds the model, **not the source
+books or their metadata**. A twelve-word source-window guard reduces verbatim
+reproduction. Raw source text is not included in release archives, and there is
+no public corpus-credit route in the application. The Pi needs no model downloads,
+Project Gutenberg access, Python, plotting service, or writable runtime cache to
+serve papers. Existing book/haiku packaging is unchanged.
 
-To update the corpus, verify each exact paper version's reuse license and
-provenance, review extracted prose, and deliberately update its manifest checksum.
-Do not simply accept a changed checksum after a download failure. Require at least
-two reviewed sources per category; missing coverage or corrupt inputs fail the
-build. The supported broad categories are `cs`, `math`, `physics`, `stat`, `q-bio`,
-`q-fin`, `econ`, and `eess`. Public availability on arXiv is not itself permission
-to redistribute or adapt a paper.
+To update the corpus, independently verify the work, edition, original language,
+Project Gutenberg rights metadata, author death year, and stable plain-text URL.
+Review the stripped prose and deliberately update its SHA-256 checksum; do not
+simply accept a changed checksum after a download failure. The extractor rejects
+non-public-domain status, translated works, and authors outside the reviewed
+death-year cutoff. Require at least two reviewed sources per category; missing
+coverage or corrupt inputs fail the build. The supported broad categories are
+`cs`, `math`, `physics`, `stat`, `q-bio`, `q-fin`, `econ`, and `eess`.
 
 The `v1` identity namespace covers both generator logic and corpus semantics.
 Freeze them once released; content-breaking changes need a new namespace and an

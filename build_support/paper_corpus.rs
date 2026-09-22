@@ -21,9 +21,10 @@ pub fn compile(out_dir: &Path) {
         status.success(),
         "Paper corpus preparation failed; see extraction/checksum error above"
     );
-    let provenance =
+    let manifest_text =
         fs::read_to_string("corpus/papers/manifest.json").expect("Missing paper manifest");
-    let manifest: serde_json::Value = serde_json::from_str(&provenance).expect("Invalid manifest");
+    let manifest: serde_json::Value =
+        serde_json::from_str(&manifest_text).expect("Invalid manifest");
     let mut compiled = TextModel {
         revision: manifest["revision"]
             .as_str()
@@ -90,5 +91,4 @@ pub fn compile(out_dir: &Path) {
         serde_json::to_vec(&compiled).unwrap(),
     )
     .unwrap();
-    fs::write(out_dir.join("paper-provenance.json"), provenance).unwrap();
 }

@@ -2,7 +2,6 @@
 """Check a running packaged paper archive; never follow external links."""
 
 import argparse
-from html import unescape
 from html.parser import HTMLParser
 import urllib.error
 import urllib.request
@@ -47,18 +46,16 @@ def check(base):
             assert headers.get_content_type() == "image/svg+xml"
             assert ET.fromstring(svg).tag.endswith("svg")
             assert b"<script" not in svg and b"NaN" not in svg
-    source, _ = fetch("/papers/sources")
-    assert "creativecommons.org/licenses/by/4.0/" in unescape(source.decode())
     for path in ("/papers/category/cs", "/papers/author/0000000c", "/blog/check", "/haiku/check", "/social"):
         fetch(path)
-    for path in ("/papers/p/invalid", links[0] + "/figures/99"):
+    for path in ("/papers/p/invalid", links[0] + "/figures/99", "/papers/sources", "/papers/corpus-credits"):
         try:
             fetch(path)
         except urllib.error.HTTPError as error:
             assert error.code == 404
         else:
             raise AssertionError(f"Expected 404 for {path}")
-    print("Paper discovery, HTML, tables, SVGs, sources and legacy endpoints passed.")
+    print("Paper discovery, HTML, tables, SVGs and legacy endpoints passed.")
 
 
 if __name__ == "__main__":

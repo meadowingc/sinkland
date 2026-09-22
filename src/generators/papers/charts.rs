@@ -1,7 +1,7 @@
 use super::{Experiment, Figure};
 use plotters::prelude::*;
 
-pub const NAMES: [&str; 8] = [
+pub const NAMES: [&str; 12] = [
     "Multi-series response curves",
     "Observation scatterplot",
     "Group mean comparison",
@@ -10,16 +10,22 @@ pub const NAMES: [&str; 8] = [
     "Measurement heatmap",
     "Mean and uncertainty intervals",
     "Stacked response areas",
+    "Violin density profiles",
+    "Sequential contribution waterfall",
+    "Parallel-coordinate summary",
+    "Multivariate response projection",
 ];
-const COLORS: [RGBColor; 3] = [
+const COLORS: [RGBColor; 5] = [
     RGBColor(26, 91, 140),
     RGBColor(184, 72, 46),
     RGBColor(51, 126, 82),
+    RGBColor(126, 84, 153),
+    RGBColor(197, 139, 39),
 ];
 
 pub fn render(data: &Experiment, figure: &Figure) -> Result<String, String> {
     if figure.kind >= NAMES.len()
-        || data.series.len() != 3
+        || !(3..=5).contains(&data.series.len())
         || data
             .series
             .iter()
@@ -47,8 +53,12 @@ pub fn render(data: &Experiment, figure: &Figure) -> Result<String, String> {
             .map(|s| s.summary.max.max(s.summary.high))
             .fold(f64::NEG_INFINITY, f64::max);
         let padding = ((max - min) * 0.15).max(1.0);
-        let grouped = matches!(figure.kind, 2 | 4 | 6);
-        let x_max = if grouped { 3.0 } else { n as f64 };
+        let grouped = matches!(figure.kind, 2 | 4 | 6 | 8);
+        let x_max = if grouped {
+            data.series.len() as f64
+        } else {
+            n as f64
+        };
         let y_max = if figure.kind == 7 {
             max.max(1.0) * 3.3
         } else {
@@ -96,7 +106,7 @@ pub fn render(data: &Experiment, figure: &Figure) -> Result<String, String> {
                 .margin(20)
                 .x_label_area_size(45)
                 .y_label_area_size(65)
-                .build_cartesian_2d(0..n as i32, 0..3_i32)
+                .build_cartesian_2d(0..n as i32, 0..data.series.len() as i32)
                 .map_err(|e| e.to_string())?;
             chart
                 .configure_mesh()
@@ -119,15 +129,232 @@ pub fn render(data: &Experiment, figure: &Figure) -> Result<String, String> {
                     }))
                     .map_err(|e| e.to_string())?;
             }
+            let legend = data
+                .series
+                .iter()
+                .enumerate()
+                .map(|(index, series)| format!("{index} {}", series.name))
+                .collect::<Vec<_>>()
+                .join(" · ");
             root.draw(&Text::new(
-                format!(
-                    "Groups: 0 baseline, 1 proposed, 2 control. Blue {min:.1} → red {max:.1} {}",
-                    data.unit
-                ),
-                (60, 485),
-                ("sans-serif", 14),
+                format!("{legend}. Blue {min:.1} → red {max:.1} {}", data.unit),
+                (45, 485),
+                ("sans-serif", 12),
             ))
             .map_err(|e| e.to_string())?;
+        } else if figure.kind == 8 {
+            let mut chart = ChartBuilder::on(&root)
+                .caption(&figure.name, ("sans-serif", 24))
+                .margin(20)
+                .x_label_area_size(50)
+                .y_label_area_size(65)
+                .build_cartesian_2d(0.0..data.series.len() as f64, min - padding..max + padding)
+                .map_err(|e| e.to_string())?;
+            chart
+                .configure_mesh()
+                .disable_x_mesh()
+                .x_desc("Configuration")
+                .y_desc(&data.unit)
+                .draw()
+                .map_err(|e| e.to_string())?;
+            let bandwidth = ((max - min) / 12.0).max(0.25);
+            for (group, series) in data.series.iter().enumerate() {
+                let center = group as f64 + 0.5;
+                let samples = 48;
+                let densities = (0..samples)
+                    .map(|step| {
+                        let y = min + (max - min) * step as f64 / (samples - 1) as f64;
+                        let density = series
+                            .values
+                            .iter()
+                            .map(|value| (-0.5 * ((y - value) / bandwidth).powi(2)).exp())
+                            .sum::<f64>();
+                        (y, density)
+                    })
+                    .collect::<Vec<_>>();
+                let peak = densities
+                    .iter()
+                    .map(|(_, density)| *density)
+                    .fold(0.0, f64::max)
+                    .max(0.01);
+                let mut polygon = densities
+                    .iter()
+                    .map(|(y, density)| (center - density / peak * 0.38, *y))
+                    .collect::<Vec<_>>();
+                polygon.extend(
+                    densities
+                        .iter()
+                        .rev()
+                        .map(|(y, density)| (center + density / peak * 0.38, *y)),
+                );
+                chart
+                    .draw_series(std::iter::once(Polygon::new(
+                        polygon,
+                        COLORS[group].mix(0.45).filled(),
+                    )))
+                    .map_err(|e| e.to_string())?;
+                chart
+                    .draw_series(std::iter::once(PathElement::new(
+                        vec![
+                            (center - 0.24, series.summary.median),
+                            (center + 0.24, series.summary.median),
+                        ],
+                        BLACK.stroke_width(2),
+                    )))
+                    .map_err(|e| e.to_string())?;
+            }
+        } else if figure.kind == 9 {
+            let baseline = data.series[0].summary.mean;
+            let changes = data
+                .series
+                .iter()
+                .skip(1)
+                .map(|series| series.summary.mean - baseline)
+                .collect::<Vec<_>>();
+            let mut levels = vec![baseline];
+            for change in &changes {
+                levels.push(levels.last().unwrap() + change);
+            }
+            let low = levels.iter().copied().fold(0.0, f64::min).min(baseline) - padding;
+            let high = levels.iter().copied().fold(0.0, f64::max).max(baseline) + padding;
+            let mut chart = ChartBuilder::on(&root)
+                .caption(&figure.name, ("sans-serif", 24))
+                .margin(20)
+                .x_label_area_size(50)
+                .y_label_area_size(65)
+                .build_cartesian_2d(0.0..data.series.len() as f64, low..high)
+                .map_err(|e| e.to_string())?;
+            chart
+                .configure_mesh()
+                .disable_x_mesh()
+                .x_desc("Sequential configuration contribution")
+                .y_desc(&data.unit)
+                .draw()
+                .map_err(|e| e.to_string())?;
+            chart
+                .draw_series(std::iter::once(Rectangle::new(
+                    [(0.15, 0.0), (0.85, baseline)],
+                    COLORS[0].mix(0.75).filled(),
+                )))
+                .map_err(|e| e.to_string())?;
+            for (index, change) in changes.iter().enumerate() {
+                let prior = levels[index];
+                let next = levels[index + 1];
+                let color = if *change >= 0.0 {
+                    RGBColor(51, 126, 82)
+                } else {
+                    RGBColor(184, 72, 46)
+                };
+                chart
+                    .draw_series(std::iter::once(Rectangle::new(
+                        [
+                            (index as f64 + 1.15, prior.min(next)),
+                            (index as f64 + 1.85, prior.max(next)),
+                        ],
+                        color.mix(0.75).filled(),
+                    )))
+                    .map_err(|e| e.to_string())?;
+            }
+        } else if figure.kind == 10 {
+            let metrics = ["Mean", "SD", "Median", "Range", "Interval"];
+            let rows = data
+                .series
+                .iter()
+                .map(|series| {
+                    let s = &series.summary;
+                    [s.mean, s.sd, s.median, s.max - s.min, s.high - s.low]
+                })
+                .collect::<Vec<_>>();
+            let mut chart = ChartBuilder::on(&root)
+                .caption(&figure.name, ("sans-serif", 24))
+                .margin(25)
+                .x_label_area_size(50)
+                .y_label_area_size(55)
+                .build_cartesian_2d(0..metrics.len() as i32, 0.0..1.0)
+                .map_err(|e| e.to_string())?;
+            chart
+                .configure_mesh()
+                .disable_mesh()
+                .x_labels(metrics.len())
+                .x_label_formatter(&|x| {
+                    metrics
+                        .get(*x as usize)
+                        .copied()
+                        .unwrap_or_default()
+                        .to_owned()
+                })
+                .y_desc("Within-metric normalized value")
+                .draw()
+                .map_err(|e| e.to_string())?;
+            for metric in 0..metrics.len() {
+                chart
+                    .draw_series(std::iter::once(PathElement::new(
+                        vec![(metric as i32, 0.0), (metric as i32, 1.0)],
+                        RGBColor(180, 188, 193),
+                    )))
+                    .map_err(|e| e.to_string())?;
+            }
+            for (group, row) in rows.iter().enumerate() {
+                let points = row
+                    .iter()
+                    .enumerate()
+                    .map(|(metric, value)| {
+                        let values = rows.iter().map(|row| row[metric]).collect::<Vec<_>>();
+                        let metric_min = values.iter().copied().fold(f64::INFINITY, f64::min);
+                        let metric_max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+                        let normalized =
+                            (*value - metric_min) / (metric_max - metric_min).max(0.01);
+                        (metric as i32, normalized)
+                    })
+                    .collect::<Vec<_>>();
+                let color = COLORS[group];
+                chart
+                    .draw_series(std::iter::once(PathElement::new(
+                        points,
+                        color.stroke_width(2),
+                    )))
+                    .map_err(|e| e.to_string())?
+                    .label(&data.series[group].name)
+                    .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color));
+            }
+            chart
+                .configure_series_labels()
+                .background_style(WHITE.mix(0.85))
+                .border_style(BLACK)
+                .draw()
+                .map_err(|e| e.to_string())?;
+        } else if figure.kind == 11 {
+            let x = &data.series[0];
+            let y = &data.series[1];
+            let size = &data.series[2];
+            let x_padding = ((x.summary.max - x.summary.min) * 0.1).max(0.5);
+            let y_padding = ((y.summary.max - y.summary.min) * 0.1).max(0.5);
+            let mut chart = ChartBuilder::on(&root)
+                .caption(&figure.name, ("sans-serif", 24))
+                .margin(20)
+                .x_label_area_size(65)
+                .y_label_area_size(65)
+                .build_cartesian_2d(
+                    x.summary.min - x_padding..x.summary.max + x_padding,
+                    y.summary.min - y_padding..y.summary.max + y_padding,
+                )
+                .map_err(|e| e.to_string())?;
+            chart
+                .configure_mesh()
+                .x_desc(&x.name)
+                .y_desc(&y.name)
+                .draw()
+                .map_err(|e| e.to_string())?;
+            let size_range = (size.summary.max - size.summary.min).max(0.01);
+            chart
+                .draw_series(x.values.iter().zip(&y.values).zip(&size.values).map(
+                    |((x_value, y_value), size_value)| {
+                        let radius =
+                            3 + (((size_value - size.summary.min) / size_range) * 7.0) as i32;
+                        Circle::new((*x_value, *y_value), radius, COLORS[2].mix(0.35).filled())
+                    },
+                ))
+                .map_err(|e| e.to_string())?;
         } else {
             let mut chart = ChartBuilder::on(&root)
                 .caption(&figure.name, ("sans-serif", 24))
@@ -146,7 +373,7 @@ pub fn render(data: &Experiment, figure: &Figure) -> Result<String, String> {
             chart
                 .configure_mesh()
                 .x_desc(if grouped {
-                    "Groups: 0.5 baseline, 1.5 proposed, 2.5 control"
+                    "Configuration index"
                 } else {
                     "Observation index"
                 })

@@ -1,4 +1,5 @@
 use crate::data::{BOOK_DATA, HAIKU_DATA, NAME_DATA, SHORT_PHRASES};
+use crate::generators::papers;
 use rand::Rng;
 use rand::seq::SliceRandom;
 use serde::Serialize;
@@ -336,7 +337,7 @@ fn extract_punctuation(word: &str) -> (String, String) {
 }
 
 fn generate_post_content<R: Rng>(rng: &mut R) -> String {
-    let style = rng.gen_range(0..6);
+    let style = rng.gen_range(0..8);
 
     match style {
         0 => {
@@ -400,7 +401,7 @@ fn generate_post_content<R: Rng>(rng: &mut R) -> String {
             let noun = NAME_DATA.nouns.choose(rng).unwrap_or(&"existence");
             format!("{} {} matters", phrase, noun)
         }
-        _ => {
+        5 => {
             // Image caption style (especially for image posts)
             let captions = [
                 "no context needed",
@@ -413,6 +414,20 @@ fn generate_post_content<R: Rng>(rng: &mut R) -> String {
                 "no thoughts head empty",
             ];
             captions.choose(rng).unwrap_or(&"✨").to_string()
+        }
+        6 => {
+            let paper = papers::random_metadata(rng);
+            format!(
+                r#"Reading <a href="/papers/p/{}" rel="nofollow noopener noreferrer">{}</a> by {} and colleagues. The section on {} is worth a look."#,
+                paper.id, paper.title, paper.authors[0].name, paper.topic
+            )
+        }
+        _ => {
+            let paper = papers::random_metadata(rng);
+            format!(
+                r#"Has anyone replicated <a href="/papers/p/{}" rel="nofollow noopener noreferrer">{}</a>? The reported {} pattern is interesting."#,
+                paper.id, paper.title, paper.topic
+            )
         }
     }
 }
@@ -590,7 +605,24 @@ fn generate_post_random_with_image<R: Rng>(rng: &mut R, force_image: Option<bool
 
     // Generate content and add hashtags
     let base_content = generate_post_content(rng);
-    let content = add_hashtags_to_content(rng, &base_content);
+    let content = if base_content.contains("/papers/p/") {
+        if rng.gen_bool(0.5) {
+            let count = rng.gen_range(1..=2);
+            let tags = generate_hashtags(rng, count);
+            format!(
+                "{}<br><br>{}",
+                base_content,
+                tags.iter()
+                    .map(|tag| hashtag_to_link(tag))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            )
+        } else {
+            base_content
+        }
+    } else {
+        add_hashtags_to_content(rng, &base_content)
+    };
 
     // Decide if this post has an image (30% chance, or forced)
     let has_image = force_image.unwrap_or_else(|| rng.gen_bool(0.3));
@@ -792,5 +824,35 @@ fn capitalize(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::{SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn paper_posts_link_to_canonical_internal_papers() {
+        let mut rng = StdRng::seed_from_u64(91);
+        let mut found = 0;
+        for _ in 0..300 {
+            let post = generate_post_random(&mut rng);
+            if let Some(start) = post.content.find("/papers/p/") {
+                let id_start = start + "/papers/p/".len();
+                let id_end = post.content[id_start..]
+                    .find('"')
+                    .map(|offset| id_start + offset)
+                    .unwrap();
+                let id = &post.content[id_start..id_end];
+                assert_eq!(id.parse::<papers::PaperId>().unwrap().to_string(), id);
+                assert_eq!(
+                    post.content.matches("<a ").count(),
+                    post.content.matches("</a>").count()
+                );
+                found += 1;
+            }
+        }
+        assert!(found > 40);
     }
 }

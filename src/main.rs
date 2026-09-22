@@ -314,6 +314,16 @@ fn generate_random_links<R: Rng>(
         .collect()
 }
 
+fn maybe_add_paper_link<R: Rng>(links: &mut Vec<(String, String)>, rng: &mut R) {
+    if rng.gen_bool(0.22) {
+        let paper = generators::papers::random_metadata(rng);
+        links.push((
+            format!("Research note: {}", paper.title),
+            format!("/papers/p/{}", paper.id),
+        ));
+    }
+}
+
 fn generate_haiku_links(num_links: usize) -> Vec<(String, String)> {
     let mut rng = rand::thread_rng();
 
@@ -409,9 +419,9 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
         // 90% single, 7% two, 3% three
         // let roll: f64 = rng.gen_range(0.0..1.0);
         // let num_images = if roll < 0.90 { 1 } else if roll < 0.97 { 2 } else { 3 };
-        
+
         let num_images = 1;
-        
+
         (0..num_images)
             .map(|_| {
                 let seed: u64 = rng.gen_range(0..u64::MAX);
@@ -430,7 +440,8 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
     };
 
     let num_links = rng.gen_range(2..=7);
-    let links = generate_random_links(num_links, &FRIENDS_LIST, &mut rng);
+    let mut links = generate_random_links(num_links, &FRIENDS_LIST, &mut rng);
+    maybe_add_paper_link(&mut links, &mut rng);
 
     let mut context = Context::new();
     context.insert("title", &title);
@@ -771,9 +782,7 @@ async fn main() -> Result<(), std::io::Error> {
         memory_usage
     );
 
-    Server::new(TcpListener::bind(bind_address))
-        .run(app)
-        .await
+    Server::new(TcpListener::bind(bind_address)).run(app).await
 }
 
 #[cfg(test)]
@@ -820,5 +829,28 @@ mod tests {
         assert!(friend_counts.iter().all(|count| *count > 0));
         let friend_fraction = friend_counts.iter().sum::<usize>() as f64 / total as f64;
         assert!((0.20..0.30).contains(&friend_fraction));
+    }
+
+    #[test]
+    fn blog_paper_links_are_internal_and_canonical() {
+        let mut rng = StdRng::seed_from_u64(17);
+        let mut found = 0;
+        for _ in 0..200 {
+            let mut links = Vec::new();
+            maybe_add_paper_link(&mut links, &mut rng);
+            for (_, url) in links {
+                let id = url
+                    .strip_prefix("/papers/p/")
+                    .expect("Paper link must be internal");
+                assert_eq!(
+                    id.parse::<generators::papers::PaperId>()
+                        .unwrap()
+                        .to_string(),
+                    id
+                );
+                found += 1;
+            }
+        }
+        assert!(found > 20);
     }
 }

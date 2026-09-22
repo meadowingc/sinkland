@@ -14,7 +14,7 @@
     </header>
     <details class="paper-citation">
         <summary>Cite this paper</summary>
-        <p>{{ archive_name | escape }}. Citations describe this generated page, not real research.</p>
+        <p>{{ archive_name | escape }}.</p>
         <label for="citation-text">Formatted citation</label>
         <textarea id="citation-text" rows="6" readonly spellcheck="false">{{ citation.text | escape }}</textarea>
         <button type="button" data-copy-citation="citation-text" hidden>Copy citation</button>
@@ -47,10 +47,9 @@
         {% endif %}
     </section>
     {% endfor %}
-    <section><h2>References — other publications</h2>
-        <p>These are fictional archive connections, not evidence or citations to real scholarship.</p>
+    <section><h2>References</h2>
         <ol class="references">{% for reference in paper.references %}
-            <li>{% for researcher in reference.authors %}{{ researcher.name | escape }}{% if not loop.last %}, {% endif %}{% endfor %} ({{ reference.year }}). <a href="/papers/p/{{ reference.id | escape }}" rel="nofollow">{{ reference.title | escape }}</a>.</li>
+            <li>{% for researcher in reference.authors %}<a href="/papers/author/{{ researcher.id | escape }}" rel="nofollow">{{ researcher.name | escape }}</a>{% if not loop.last %}, {% endif %}{% endfor %} ({{ reference.year }}). <a href="/papers/p/{{ reference.id | escape }}" rel="nofollow">{{ reference.title | escape }}</a>.</li>
         {% endfor %}</ol>
     </section>
     <section><h2>Related publications</h2>
