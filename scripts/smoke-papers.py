@@ -13,6 +13,9 @@ class Page(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.links = []
         self.figures = []
+        self.headings = []
+        self.anchors = set()
+        self.contents = []
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
@@ -21,6 +24,12 @@ class Page(HTMLParser):
             self.links.append(attrs["href"])
         if tag == "img" and attrs.get("src", "").startswith("/papers/p/"):
             self.figures.append(attrs["src"])
+        if tag == "section" and attrs.get("id", "").startswith("section-"):
+            self.anchors.add(attrs["id"])
+        if tag in ("h2", "h3"):
+            self.headings.append(tag)
+        if tag == "a" and attrs.get("href", "").startswith("#section-"):
+            self.contents.append(attrs["href"][1:])
 
 
 def check(base):
@@ -36,6 +45,10 @@ def check(base):
         page = Page(html.decode())
         assert 2 <= len(page.figures) <= 10
         assert html.count(b"<table>") == 2 * len(page.figures)
+        assert page.headings.count("h3") == len(page.figures)
+        assert len(page.contents) >= 5
+        assert len(page.contents) == len(set(page.contents))
+        assert all(anchor in page.anchors for anchor in page.contents)
         assert b"Cite this paper" in html
         bibtex, headers = fetch(path + "/citation.bib")
         assert headers.get_content_type() == "application/x-bibtex"

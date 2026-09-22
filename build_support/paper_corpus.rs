@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fs, path::Path, process::Command};
 
 #[path = "../src/generators/papers/model.rs"]
 mod model;
-use model::{CATEGORIES, CategoryModel, TextModel, fingerprint, words};
+use model::{CATEGORIES, CategoryModel, TextModel, words};
 
 pub fn compile(out_dir: &Path) {
     for path in [
@@ -55,10 +55,6 @@ pub fn compile(out_dir: &Path) {
             );
             println!("cargo:rerun-if-changed={path}");
             let text = fs::read_to_string(path).expect("Prepared source is missing");
-            let all_words = words(&text);
-            for window in all_words.windows(12) {
-                model.source_windows.insert(fingerprint(&window.join(" ")));
-            }
             for sentence in text.split(['.', '!', '?']) {
                 let tokens = words(sentence);
                 if tokens.len() < 5 {

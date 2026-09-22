@@ -1,7 +1,7 @@
 {% extends "papers/base.html.tera" %}
 {% block title %}{{ paper.metadata.title | escape }} — Sinkland Papers{% endblock title %}
 {% block research_content %}
-<article>
+<article class="research-paper">
     <header class="paper-header">
         <div class="paper-meta">{{ paper.metadata.category_name | escape }} · {{ paper.metadata.year }}</div>
         <h1>{{ paper.metadata.title | escape }}</h1>
@@ -26,9 +26,19 @@
         <p id="citation-status" role="status" aria-live="polite"></p>
     </details>
     <section class="paper-abstract"><h2>Abstract</h2><p>{{ paper.abstract_text | escape }}</p></section>
+    <nav class="paper-contents" aria-label="Paper contents">
+        <strong>Contents</strong>
+        <ol>{% for section in paper.sections %}{% if section.level == 2 %}
+            <li><a href="#{{ section.anchor | escape }}">{{ section.number | escape }}. {{ section.title | escape }}</a></li>
+        {% endif %}{% endfor %}</ol>
+    </nav>
     {% for section in paper.sections %}
-    <section class="paper-section">
-        <h2>{{ section.title | escape }}</h2>
+    <section class="paper-section{% if section.level == 3 %} paper-subsection{% endif %}" id="{{ section.anchor | escape }}">
+        {% if section.level == 2 %}
+        <h2>{{ section.number | escape }}. {{ section.title | escape }}</h2>
+        {% else %}
+        <h3>{{ section.number | escape }} {{ section.title | escape }}</h3>
+        {% endif %}
         {% for paragraph in section.paragraphs %}<p>{{ paragraph | escape }}</p>{% endfor %}
         {% for table in section.tables %}
         <div class="table-scroll" tabindex="0" role="region" aria-label="{{ table.caption | escape }}">

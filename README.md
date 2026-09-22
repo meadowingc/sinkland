@@ -69,6 +69,16 @@ ten-experiment paper has twenty tables). Tables, numeric statements, and charts
 all derive from the same observations. The uncertainty bars use the documented
 normal approximation and are explicitly illustrative, not real evidence.
 
+Paper structure now follows one of three seeded archetypes: comparative study,
+methods/benchmark, or observational analysis. Different outlines group results
+under appropriate headings and may include sensitivity, distributional, or
+cross-setting checks; they are not just renamed copies of one sequence. The
+abstract, methods, results, and interpretation include descriptive values
+calculated from the same observations that populate their figures and tables.
+Even two-figure papers have at least 650 words of prose, with longer papers
+growing through their results rather than generic filler. Numbered headings,
+in-page contents links, responsive measure, and print styling help navigation.
+
 Titles use fourteen structural forms and short category-conditioned phrases from
 the compiled transition model rather than a single repeated prefix. Blog related
 links and a subset of social posts also point to canonical papers within the
@@ -94,10 +104,11 @@ short headings, and other non-paragraph fragments before normalization. To avoid
 embedding entire books, it deterministically samples about 25,000 words across
 each work rather than taking only its opening chapters.
 
-Rust compiles sorted, category-specific word-transition maps and source-window
-fingerprints into `OUT_DIR`. The executable embeds the model, **not the source
-books or their metadata**. A twelve-word source-window guard reduces verbatim
-reproduction. Raw source text is not included in release archives, and there is
+Rust compiles sorted, category-specific word-transition maps into `OUT_DIR`.
+The executable uses short, filtered phrases from these maps in titles; the
+paper body instead describes its own generated observations. The executable
+embeds the model, **not the source books or their metadata**. Raw source text
+is not included in release archives, and there is
 no public corpus-credit route in the application. The Pi needs no model downloads,
 Project Gutenberg access, Python, plotting service, or writable runtime cache to
 serve papers. Existing book/haiku packaging is unchanged.
