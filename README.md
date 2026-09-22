@@ -11,6 +11,9 @@ Generated links stay inside Sinkland unless you configure friend traps through
 blog links point to them and 75% stay internal; without friends, all stay internal.
 Only add trap sites whose operators have agreed to receive crawler traffic.
 Sinkland does not mix unrelated real sites into its generated links.
+In blog paragraphs, inline links wrap short 2–4-word phrases with meaningful
+endpoints rather than isolated stopwords; they do not span sentence punctuation.
+Related-article links and friend-link probabilities are otherwise unchanged.
 
 ## Local development
 

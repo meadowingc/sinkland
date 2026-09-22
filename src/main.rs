@@ -157,7 +157,14 @@ fn generate_random_paragraphs(
 // Helper function to add random inline links to paragraphs
 fn add_inline_links_to_paragraphs(paragraphs: Vec<String>) -> Vec<String> {
     let mut rng = rand::thread_rng();
+    add_inline_links_to_paragraphs_with_rng(paragraphs, &FRIENDS_LIST, &mut rng)
+}
 
+fn add_inline_links_to_paragraphs_with_rng<R: Rng>(
+    paragraphs: Vec<String>,
+    friends: &[String],
+    rng: &mut R,
+) -> Vec<String> {
     paragraphs
         .into_iter()
         .map(|paragraph| {
@@ -178,62 +185,92 @@ fn add_inline_links_to_paragraphs(paragraphs: Vec<String>) -> Vec<String> {
                 return paragraph;
             }
 
-            let linkable_start = 2;
-            let linkable_end = words.len().saturating_sub(2);
+            let mut candidates = (2..words.len().saturating_sub(2))
+                .flat_map(|start| (2..=4).map(move |length| (start, start + length)))
+                .filter(|&(start, end)| {
+                    end <= words.len() - 2
+                        && is_link_content_word(words[start])
+                        && is_link_content_word(words[end - 1])
+                        && words[start..end - 1]
+                            .iter()
+                            .all(|word| !ends_phrase_boundary(word))
+                })
+                .collect::<Vec<_>>();
+            candidates.shuffle(rng);
 
-            if linkable_end <= linkable_start {
-                return paragraph;
-            }
-
-            let mut link_positions: Vec<usize> = (linkable_start..linkable_end).collect();
-            link_positions.shuffle(&mut rng);
-
-            let mut selected_positions = Vec::new();
-            for pos in link_positions {
-                if selected_positions.is_empty()
-                    || selected_positions
-                        .iter()
-                        .all(|&p: &usize| (p as i32 - pos as i32).abs() > 5)
-                {
-                    selected_positions.push(pos);
-                    if selected_positions.len() >= num_links {
+            let mut selected = Vec::new();
+            for (start, end) in candidates {
+                if selected.iter().all(|&(other_start, other_end)| {
+                    end + 2 <= other_start || other_end + 2 <= start
+                }) {
+                    selected.push((start, end));
+                    if selected.len() == num_links {
                         break;
                     }
                 }
             }
 
-            selected_positions.sort();
-
-            let links = generate_random_links(selected_positions.len(), &FRIENDS_LIST, &mut rng);
+            selected.sort_unstable();
+            let links = generate_random_links(selected.len(), friends, rng);
+            selected.truncate(links.len());
 
             let mut result = String::new();
             let mut link_index = 0;
-
-            for (i, word) in words.iter().enumerate() {
+            let mut word_index = 0;
+            while word_index < words.len() {
                 if !result.is_empty() {
                     result.push(' ');
                 }
-
-                if let Some(&pos) = selected_positions.get(link_index) {
-                    if i == pos && link_index < links.len() {
-                        let (clean_word, punctuation) = extract_word_and_punctuation(word);
-
-                        result.push_str(&format!(
-                            r#"<a href="{}" rel="nofollow noopener noreferrer">{}</a>{}"#,
-                            links[link_index].1, clean_word, punctuation
-                        ));
-                        link_index += 1;
-                    } else {
-                        result.push_str(word);
-                    }
+                if let Some(&(start, end)) = selected
+                    .get(link_index)
+                    .filter(|&&(start, _)| start == word_index)
+                {
+                    let (last_word, punctuation) = extract_word_and_punctuation(words[end - 1]);
+                    let phrase = words[start..end - 1]
+                        .iter()
+                        .copied()
+                        .chain(std::iter::once(last_word.as_str()))
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    result.push_str(&format!(
+                        r#"<a href="{}" rel="nofollow noopener noreferrer">{}</a>{}"#,
+                        links[link_index].1, phrase, punctuation
+                    ));
+                    link_index += 1;
+                    word_index = end;
                 } else {
-                    result.push_str(word);
+                    result.push_str(words[word_index]);
+                    word_index += 1;
                 }
             }
 
             result
         })
         .collect()
+}
+
+fn is_link_content_word(word: &str) -> bool {
+    const STOPWORDS: &[&str] = &[
+        "about", "after", "again", "also", "among", "and", "are", "as", "at", "been", "before",
+        "being", "between", "both", "but", "by", "can", "could", "did", "do", "does", "each",
+        "either", "even", "for", "from", "had", "has", "have", "he", "her", "here", "hers", "him",
+        "his", "how", "i", "if", "in", "into", "is", "it", "its", "may", "might", "more", "most",
+        "much", "my", "neither", "no", "nor", "not", "of", "on", "or", "our", "ours", "over",
+        "she", "should", "so", "some", "such", "than", "that", "the", "their", "theirs", "them",
+        "there", "these", "they", "this", "those", "through", "to", "under", "until", "up", "upon",
+        "us", "was", "we", "were", "what", "when", "where", "whether", "which", "while", "who",
+        "whom", "whose", "why", "will", "with", "would", "you", "your",
+    ];
+    let clean = word.trim_matches(|character: char| !character.is_alphanumeric());
+    clean.len() >= 4
+        && clean.chars().all(char::is_alphabetic)
+        && word.chars().next().is_some_and(char::is_alphabetic)
+        && !STOPWORDS.contains(&clean.to_lowercase().as_str())
+}
+
+fn ends_phrase_boundary(word: &str) -> bool {
+    word.trim_end_matches(['"', '\'', ')', ']', '”', '’'])
+        .ends_with(['.', ',', ';', ':', '!', '?'])
 }
 
 fn extract_word_and_punctuation(word: &str) -> (String, String) {
@@ -852,5 +889,62 @@ mod tests {
             }
         }
         assert!(found > 20);
+    }
+
+    #[test]
+    fn inline_links_wrap_short_phrases_not_stopwords_or_sentence_boundaries() {
+        let paragraph = "At the old harbor, morning light reached the quiet garden. \
+            Ancient rivers carried stories through the southern valley, while distant \
+            mountains framed the silver horizon. Beyond the long passage lay another \
+            forgotten village with narrow streets and weathered stone houses.";
+        let mut seen = 0;
+        let mut lengths = std::collections::BTreeSet::new();
+        for seed in 0..200 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let rendered =
+                add_inline_links_to_paragraphs_with_rng(vec![paragraph.to_owned()], &[], &mut rng)
+                    .remove(0);
+            let mut restored = String::new();
+            let mut rest = rendered.as_str();
+            while let Some((before, after_open)) = rest.split_once("<a href=\"") {
+                restored.push_str(before);
+                let (url_and_attributes, after_attributes) = after_open.split_once('>').unwrap();
+                assert!(url_and_attributes.starts_with("/blog/"));
+                let (text, after_close) = after_attributes.split_once("</a>").unwrap();
+                let words = text.split_whitespace().collect::<Vec<_>>();
+                assert!((2..=4).contains(&words.len()), "{text}");
+                assert!(is_link_content_word(words[0]), "{text}");
+                assert!(is_link_content_word(words[words.len() - 1]), "{text}");
+                assert!(
+                    words[..words.len() - 1]
+                        .iter()
+                        .all(|word| !ends_phrase_boundary(word)),
+                    "{text}"
+                );
+                restored.push_str(text);
+                seen += 1;
+                lengths.insert(words.len());
+                rest = after_close;
+            }
+            restored.push_str(rest);
+            assert_eq!(restored, paragraph);
+        }
+        assert!(seen > 100);
+        assert_eq!(lengths, std::collections::BTreeSet::from([2, 3, 4]));
+    }
+
+    #[test]
+    fn inline_links_skip_paragraphs_without_meaningful_anchors() {
+        let paragraph = "In as and they in as and they in as and they in as and they.";
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            assert_eq!(
+                add_inline_links_to_paragraphs_with_rng(vec![paragraph.to_owned()], &[], &mut rng,),
+                vec![paragraph.to_owned()]
+            );
+        }
+        for word in ["in", "as", "and", "they", "They,", "the", "with"] {
+            assert!(!is_link_content_word(word), "{word}");
+        }
     }
 }
