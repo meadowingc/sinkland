@@ -18,7 +18,7 @@ Sinkland does not mix unrelated real sites into its generated links.
 cargo run
 ```
 
-Visit `http://localhost:43796/`, `/blog/anything`, `/haiku/anything`, or `/social`.
+Visit `http://localhost:43796/`, `/blog/anything`, `/haiku/anything`, `/social`, or `/papers`.
 The default listener is `0.0.0.0:43796`; set `SINKLAND_BIND=127.0.0.1:43796` to
 listen only on loopback. This setting accepts an IP address and port, not a hostname.
 
@@ -26,6 +26,93 @@ The first build downloads books from Project Gutenberg, a haiku dataset, and blo
 posts into `assets/`. Run the executable from a directory containing `assets/`,
 `templates/`, and `static/`. An optional `.env` file can set `SINKLAND_FRIENDS` to a
 JSON array of URLs.
+
+## Synthetic academic papers
+
+`/papers` is a procedural research archive: invented titles and researchers,
+academic-sounding connective prose, synthetic experiments, tables, references,
+and **2–10 SVG figures** per paper. Search is deliberately fake: each submission
+generates new discoveries, with recognized topic words influencing the theme.
+It is not a search engine for real research.
+
+Each result has a canonical, revisioned paper ID. Its title, ordered author list, datasets,
+statistics, references, and figures are repeatable when you revisit it. Seeded
+discovery pagination is repeatable too; submitting the search form again starts
+a new discovery. Author profiles have stable fictional identities and generate
+papers belonging to those authors. All fictional references stay inside the
+archive. Real source attribution appears separately at `/papers/sources`.
+
+The archive uses neutral academic titles and institution names rather than
+scripted jokes. Each paper has **2–12 fictional authors**: familiar given names,
+optional middle names, and surnames assembled from pronounceable fragments.
+Names are not taken from researcher profiles, but coincidental matches to real
+people or institutions cannot be ruled out. An author's identity and affiliation
+stay consistent across papers; profile listings generate papers with that author
+first rather than claiming to index all their collaborations.
+
+The **Cite this paper** panel provides a formatted citation and BibTeX with the
+complete ordered byline, plus a `.bib` download and permanent paper link. Both
+formats explicitly identify the manuscript as synthetic. Copy buttons use the
+browser clipboard when permitted and offer manual selection otherwise; viewing
+and downloading citations also work without JavaScript.
+
+Figures include line plots, scatterplots, mean bars, histograms, box-and-whisker
+plots, measurement heatmaps, uncertainty intervals, and stacked areas. Tables
+come from each experiment section, without a separate table-count cap (a
+ten-experiment paper has twenty tables). Tables, numeric statements, and charts
+all derive from the same observations. The uncertainty bars use the documented
+normal approximation and are explicitly illustrative, not real evidence.
+
+### Build-time paper corpus
+
+Building now also requires **Python 3**. `build.rs` invokes
+`scripts/prepare-paper-corpus.py` to prepare a small, version-pinned selection of
+CC BY/CC0 arXiv papers from `corpus/papers/manifest.json`. HTML is the preferred
+source format; only explicitly selected PDF entries require `pdftotext` from
+`poppler-utils` on the build machine. No PDF tool is needed for the current
+HTML-only manifest.
+
+The first build fetches missing inputs sequentially with conservative pacing.
+Cleaned text is cached under `target/sinkland-paper-corpus/` and verified against
+reviewed SHA-256 checksums before use. A warm cache permits offline paper-corpus
+preparation; the existing books/haikus must also be present for an entirely
+offline build. Extraction excludes article metadata, bibliography, equations,
+figures, tables, scripts, and navigation.
+
+Rust compiles sorted, category-specific word-transition maps and source-window
+fingerprints into `OUT_DIR`. The executable embeds the model and attribution,
+**not full academic source texts**. A twelve-word source-window guard reduces
+verbatim reproduction; it does not replace licenses or required attribution.
+Raw source HTML/PDF and extracted text are not included in release archives.
+The Pi needs no model downloads, arXiv access, Python, plotting service, or
+writable runtime cache to serve papers. Existing book/haiku packaging is unchanged.
+
+To update the corpus, verify each exact paper version's reuse license and
+provenance, review extracted prose, and deliberately update its manifest checksum.
+Do not simply accept a changed checksum after a download failure. Require at least
+two reviewed sources per category; missing coverage or corrupt inputs fail the
+build. The supported broad categories are `cs`, `math`, `physics`, `stat`, `q-bio`,
+`q-fin`, `econ`, and `eess`. Public availability on arXiv is not itself permission
+to redistribute or adapt a paper.
+
+The `v1` identity namespace covers both generator logic and corpus semantics.
+Freeze them once released; content-breaking changes need a new namespace and an
+explicit old-URL compatibility decision. Live footer counters are not part of the
+deterministic paper content. Keep dependency versions locked for reproducibility.
+
+### Development checks
+
+```bash
+cargo test --locked
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+# With Sinkland running:
+python3 scripts/smoke-papers.py
+```
+
+New paper templates explicitly escape their text and query fields; figures are
+served as same-origin SVG images, not interpolated HTML. SVG-only Plotters needs
+no browser JavaScript or native font libraries. Generation runs without a database;
+CPU-heavy paper/figure handlers use blocking tasks rather than Tokio worker threads.
 
 ## Raspberry Pi releases (GitHub mirror)
 

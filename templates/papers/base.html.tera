@@ -1,0 +1,56 @@
+{% extends "base.html.tera" %}
+{% block extra_styles %}
+.content { max-width: 1100px; }
+.research-notice { padding: 14px 18px; background: #fff4d6; border-left: 4px solid #bb8620; margin-bottom: 24px; }
+.research-nav { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+.research-nav a, .paper-card a, .paper-header a, .references a { color: #245c80; }
+.research-search { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.research-search input { flex: 1; min-width: 180px; padding: 12px; font: inherit; border: 1px solid #8c969c; }
+.research-search button { padding: 12px 20px; background: #245c80; color: white; border: 0; font: inherit; cursor: pointer; }
+.paper-card { padding: 22px 0; border-bottom: 1px solid #dce2e5; }
+.paper-card h2 { margin: 0 0 10px; }
+.paper-meta { color: #586773; font-size: .95em; }
+.paper-header { border-bottom: 2px solid #245c80; padding-bottom: 20px; }
+.paper-header h1 { border: 0; margin-bottom: 10px; }
+.paper-authors { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 24px; list-style: none; margin: 18px 0; }
+.paper-authors span { display: block; }
+.paper-citation { margin: 22px 0; padding: 16px; border: 1px solid #ccd5db; background: #f3f6f8; }
+.paper-citation summary { cursor: pointer; font-weight: bold; color: #245c80; }
+.paper-citation label { display: block; margin-top: 16px; font-weight: bold; }
+.paper-citation textarea { display: block; width: 100%; resize: vertical; padding: 12px; font-size: .9em; line-height: 1.5; }
+.paper-citation button, .paper-citation a { margin: 8px 12px 8px 0; }
+.paper-citation button { padding: 6px 12px; cursor: pointer; }
+.paper-abstract { margin: 28px 0; padding: 22px; background: #f3f6f8; }
+.paper-section { margin: 38px 0; }
+.paper-section p { max-width: 85ch; }
+.table-scroll { overflow-x: auto; margin: 24px 0; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: .9em; }
+caption { text-align: left; font-weight: bold; margin-bottom: 10px; }
+th, td { padding: 10px 12px; border-bottom: 1px solid #ccd5db; text-align: right; }
+th:first-child, td:first-child { text-align: left; }
+thead { background: #edf2f5; }
+figure { margin: 30px 0; }
+figure img { width: 100%; height: auto; border: 1px solid #dde4e8; }
+figcaption { color: #586773; margin: 8px 0; }
+.references { padding-left: 24px; }
+.references li { margin: 15px 0; }
+.pagination { display: flex; gap: 25px; margin: 30px 0; }
+.source { overflow-wrap: anywhere; padding: 20px 0; border-bottom: 1px solid #ccd5db; }
+@media print {
+  .navbar, .site-footer, .research-search, .research-nav, .pagination { display: none; }
+  .content { max-width: none; padding: 0; }
+  figure, tr { break-inside: avoid; }
+  .research-notice { border: 1px solid #777; }
+}
+{% endblock extra_styles %}
+{% block content %}
+<nav class="research-nav" aria-label="Research categories">
+    <a href="/papers" rel="nofollow">All discoveries</a>
+    {% for category in categories %}<a href="/papers/category/{{ category.0 | escape }}" rel="nofollow">{{ category.1 | escape }}</a>{% endfor %}
+</nav>
+<form class="research-search" action="/papers/search" method="get" role="search">
+    <input type="search" name="q" aria-label="Inspiration for generated discoveries" placeholder="Try quantum fluctuations or Bayesian inference" maxlength="200" value="{{ query | default(value='') | escape }}">
+    <button type="submit">Generate discoveries</button>
+</form>
+{% block research_content %}{% endblock research_content %}
+{% endblock content %}

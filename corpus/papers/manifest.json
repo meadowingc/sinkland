@@ -1,0 +1,257 @@
+{
+  "revision": "v1",
+  "extraction_revision": 1,
+  "papers": [
+    {
+      "id": "2609.22086v1",
+      "category": "cs",
+      "title": "Designer-RSI: Evolving Procedural Memory from User Traffic for Agentic Graphic Design",
+      "authors": [
+        "Du, Hongyang",
+        "Yan, Lan",
+        "Flores, Christian",
+        "Kadav, Asim"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.22086v1",
+      "content_url": "https://arxiv.org/html/2609.22086v1",
+      "format": "html",
+      "text_sha256": "48b8bbda4cdea4300fcbcaea5f52d94a3c8cb1929a2d404e6e0958b4b474a1ec",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.22085v1",
+      "category": "cs",
+      "title": "SeeQ: Training Generalist Value Functions for Long-Horizon Robotic Manipulation",
+      "authors": [
+        "Singh, Saksham",
+        "Hu, Zheyuan",
+        "Mark, Max Sobol",
+        "Yu, Jeffrey",
+        "Erickson, Zackory",
+        "Kumar, Aviral"
+      ],
+      "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.22085v1",
+      "content_url": "https://arxiv.org/html/2609.22085v1",
+      "format": "html",
+      "text_sha256": "a5fe7f3903b09449ab2f82c011522917bf692932a74d98b5563fae2e07f0f567",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.22077v1",
+      "category": "math",
+      "title": "Energy minimization for eight points on the sphere",
+      "authors": [
+        "Kryvonos, Liudmyla",
+        "Liehr, Lukas",
+        "Taylor, Mitchell A."
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.22077v1",
+      "content_url": "https://arxiv.org/html/2609.22077v1",
+      "format": "html",
+      "text_sha256": "7364631a2578640a869c11671a4b57d1cd24d517bbfec77b7b65289780bd2a6f",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.22066v1",
+      "category": "math",
+      "title": "Generalized Hamiltonian formalism for spatially nonlocal nonlinear differential equations",
+      "authors": [
+        "Pazarci, Ali",
+        "Ghazanfari, Nadir",
+        "Gahramanov, Ilmar"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.22066v1",
+      "content_url": "https://arxiv.org/html/2609.22066v1",
+      "format": "html",
+      "text_sha256": "6c63fc4d4d5328d1a76d3a1af2556d9884de271aaad713e5a13e90ba28c9ac93",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.22036v1",
+      "category": "physics",
+      "title": "Moderator Modeling for High Intensity Slow Positron Sources",
+      "authors": [
+        "Crisp, Sophie",
+        "Goldman, Ryland",
+        "Gessner, Spencer"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.22036v1",
+      "content_url": "https://arxiv.org/html/2609.22036v1",
+      "format": "html",
+      "text_sha256": "452b15674cc89e0c5b350b7b87d8e05fd4fcb1f4ed96ae83c2e3f49922ad4ddf",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.22006v1",
+      "category": "physics",
+      "title": "All-Optical Control over Nonlocality for Ultrafast Image Processing with an Excitonic Metasurface",
+      "authors": [
+        "Dias, Bernardo S.",
+        "Tirole, Romain",
+        "Guizzardi, Michele",
+        "Cordaro, Andrea",
+        "Polman, Albert",
+        "Al\u00f9, Andrea",
+        "van de Groep, Jorik"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.22006v1",
+      "content_url": "https://arxiv.org/html/2609.22006v1",
+      "format": "html",
+      "text_sha256": "4514430381c472b45cbb8820d20f1b151e9814cc075d39471a8aa8169eef4d43",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.21998v1",
+      "category": "stat",
+      "title": "A Novel Convolution-Based Stratified Attribute Estimator for QRE Determination in R&D Tax Credit Studies",
+      "authors": [
+        "Goldwasser, Deborah Lynn"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.21998v1",
+      "content_url": "https://arxiv.org/html/2609.21998v1",
+      "format": "html",
+      "text_sha256": "85e196477e1ef7ddfb38b8b2ddcec2056e75017bd96e98cb8266ac1c3505fa71",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.21985v1",
+      "category": "stat",
+      "title": "Consistency of Optimal Matching-based Clustering for Mixtures of Markov Chains",
+      "authors": [
+        "Khalifa, Ottavio"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.21985v1",
+      "content_url": "https://arxiv.org/html/2609.21985v1",
+      "format": "html",
+      "text_sha256": "8975da8c8e7f7e6a2575745b5110cabf4e38acd1ae3ec6dc4eff524b21c09c4d",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.21700v1",
+      "category": "q-bio",
+      "title": "Best Matches in Phylogenetic Networks",
+      "authors": [
+        "Ebert, Patricia A.",
+        "Stadler, Peter F.",
+        "Hellmuth, Marc"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.21700v1",
+      "content_url": "https://arxiv.org/html/2609.21700v1",
+      "format": "html",
+      "text_sha256": "090f9a87a48b6af3b7d8b20787f7e30a90f41972757967df0a8882c1ee5c5fd9",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.21272v1",
+      "category": "q-bio",
+      "title": "Identifying Neural State Changes due to Gain versus Off-Manifold Displacement",
+      "authors": [
+        "McKenzie, Sam"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.21272v1",
+      "content_url": "https://arxiv.org/html/2609.21272v1",
+      "format": "html",
+      "text_sha256": "a025bbdb5aab8b8478bbc917b72c00f37ede424195975802c1d2525ad528ce53",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.21271v1",
+      "category": "q-fin",
+      "title": "Nested Clustered Optimization Is One End of a Schur Bridge, and the Interior Is Sometimes Provably Better",
+      "authors": [
+        "Cotton, Peter"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.21271v1",
+      "content_url": "https://arxiv.org/html/2609.21271v1",
+      "format": "html",
+      "text_sha256": "be4300ec450a5d4136dec7095762ce0df81ed7d81fe5b2458b5769dc37f46fd6",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.20405v1",
+      "category": "q-fin",
+      "title": "An Arbitrarily Precise Global Closed Form Approximation for the Neoclassical Growth Model",
+      "authors": [
+        "Roulleau-Pasdeloup, Jordan"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.20405v1",
+      "content_url": "https://arxiv.org/html/2609.20405v1",
+      "format": "html",
+      "text_sha256": "393856eaf1b2c0ed10fa244a677ee7d8e6f5a198def3b269c482c068bde740df",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.21056v1",
+      "category": "econ",
+      "title": "Poisson Regression under Multivariate Sample Selection",
+      "authors": [
+        "Morozov, Kirill O."
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.21056v1",
+      "content_url": "https://arxiv.org/html/2609.21056v1",
+      "format": "html",
+      "text_sha256": "a453b5f9865a261898f0c21444f421415f849861f09b1ce25824f610152698ef",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.20421v1",
+      "category": "econ",
+      "title": "Stable Allocations, Unstable Payment Paths: The Shapley Value and Voluntary Coalition Formation",
+      "authors": [
+        "Lim, Tongseok"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.20421v1",
+      "content_url": "https://arxiv.org/html/2609.20421v1",
+      "format": "html",
+      "text_sha256": "e1fac51cf095ef09ba1596850c344e1a8af7d44921b674750727f0a43f9746f7",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.22031v1",
+      "category": "eess",
+      "title": "Partial Accent-Control Editing in Frozen Speech Representations for Accent Conversion",
+      "authors": [
+        "Qu, Yangyang",
+        "Panariello, Michele",
+        "Todisco, Massimiliano",
+        "Evans, Nicholas"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.22031v1",
+      "content_url": "https://arxiv.org/html/2609.22031v1",
+      "format": "html",
+      "text_sha256": "5d66e77aca8ca773cc133c4f04d726b56867df45dbaeb5d59a6df258c3225531",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    },
+    {
+      "id": "2609.21898v1",
+      "category": "eess",
+      "title": "BLINC: Blind Calibration For Training-Free Speech Enhancement Adaptation",
+      "authors": [
+        "Raichle, Tobias",
+        "Gavrilko, Ekaterina",
+        "Yang, Bin"
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "abstract_url": "https://arxiv.org/abs/2609.21898v1",
+      "content_url": "https://arxiv.org/html/2609.21898v1",
+      "format": "html",
+      "text_sha256": "2e5a67e43d42e233484b06299d5996b75c58cc7fa05f3f8597b007dc5d303569",
+      "notes": "Article prose only; source figures, tables, equations, metadata and bibliography excluded."
+    }
+  ]
+}

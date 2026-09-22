@@ -50,6 +50,7 @@
         
         .navbar-links {
             display: flex;
+            flex-wrap: wrap;
             gap: 20px;
             list-style: none;
         }
@@ -158,6 +159,10 @@
             margin: 0;
         }
         
+        @media (max-width: 650px) {
+            .navbar-container { flex-direction: column; gap: 12px; }
+            .navbar-links { justify-content: center; gap: 6px; }
+        }
         {% block extra_styles %}{% endblock extra_styles %}
     </style>
 </head>
@@ -169,6 +174,7 @@
                 <li><a href="/blog/blog-posts" rel="nofollow noopener noreferrer">Blog</a></li>
                 <li><a href="/haiku/reflections" rel="nofollow noopener noreferrer">Haiku</a></li>
                 <li><a href="/social" rel="nofollow noopener noreferrer">Social</a></li>
+                <li><a href="/papers" rel="nofollow noopener noreferrer">Papers</a></li>
             </ul>
         </div>
     </nav>
@@ -183,7 +189,8 @@
                 📊 Page visits: 
                 <span class="visit-stat">📚 Blog: <strong>{{ blog_visits | default(value=0) }}</strong></span> · 
                 <span class="visit-stat">🍃 Haiku: <strong>{{ haiku_visits | default(value=0) }}</strong></span> · 
-                <span class="visit-stat">💬 Social: <strong>{{ social_visits | default(value=0) }}</strong></span><br/> 
+                <span class="visit-stat">💬 Social: <strong>{{ social_visits | default(value=0) }}</strong></span> ·
+                <span class="visit-stat">Papers: <strong>{{ paper_visits | default(value=0) }}</strong></span><br/>
                 <span class="visit-stat">🌐 Total: <strong>{{ total_visits | default(value=0) }}</strong></span>
             </p>
         </div>

@@ -1,0 +1,63 @@
+{% extends "papers/base.html.tera" %}
+{% block title %}{{ paper.metadata.title | escape }} — Sinkland Papers{% endblock title %}
+{% block research_content %}
+<article>
+    <header class="paper-header">
+        <div class="paper-meta">{{ paper.metadata.category_name | escape }} · {{ paper.metadata.year }}</div>
+        <h1>{{ paper.metadata.title | escape }}</h1>
+        <ul class="paper-authors">
+        {% for researcher in paper.metadata.authors %}
+            <li><a href="/papers/author/{{ researcher.id | escape }}" rel="nofollow">{{ researcher.name | escape }}</a><span class="paper-meta">{{ researcher.affiliation | escape }}</span></li>
+        {% endfor %}
+        </ul>
+        <div class="paper-meta">Archive ID: {{ paper.metadata.id | escape }}</div>
+    </header>
+    <details class="paper-citation">
+        <summary>Cite this paper</summary>
+        <p>{{ archive_name | escape }}. Citations describe this generated page, not real research.</p>
+        <label for="citation-text">Formatted citation</label>
+        <textarea id="citation-text" rows="6" readonly spellcheck="false">{{ citation.text | escape }}</textarea>
+        <button type="button" data-copy-citation="citation-text" hidden>Copy citation</button>
+        <label for="citation-bibtex">BibTeX</label>
+        <textarea id="citation-bibtex" rows="10" readonly spellcheck="false">{{ citation.bibtex | escape }}</textarea>
+        <button type="button" data-copy-citation="citation-bibtex" hidden>Copy BibTeX</button>
+        <a href="/papers/p/{{ paper.metadata.id | escape }}/citation.bib" download rel="nofollow">Download .bib</a>
+        <a href="/papers/p/{{ paper.metadata.id | escape }}" rel="nofollow">Permanent paper link</a>
+        <p id="citation-status" role="status" aria-live="polite"></p>
+    </details>
+    <section class="paper-abstract"><h2>Abstract</h2><p>{{ paper.abstract_text | escape }}</p></section>
+    {% for section in paper.sections %}
+    <section class="paper-section">
+        <h2>{{ section.title | escape }}</h2>
+        {% for paragraph in section.paragraphs %}<p>{{ paragraph | escape }}</p>{% endfor %}
+        {% for table in section.tables %}
+        <div class="table-scroll" tabindex="0" role="region" aria-label="{{ table.caption | escape }}">
+            <table>
+                <caption>{{ table.caption | escape }}</caption>
+                <thead><tr>{% for header in table.headers %}<th scope="col">{{ header | escape }}</th>{% endfor %}</tr></thead>
+                <tbody>{% for row in table.rows %}<tr>{% for cell in row %}<td>{{ cell | escape }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+            </table>
+        </div>
+        {% endfor %}
+        {% if section.figure %}
+        <figure>
+            <img src="/papers/p/{{ paper.metadata.id | escape }}/figures/{{ section.figure.index }}" alt="{{ section.figure.caption | escape }} See the accompanying tables for values." width="900" height="500" loading="lazy">
+            <figcaption>{{ section.figure.caption | escape }}</figcaption>
+        </figure>
+        {% endif %}
+    </section>
+    {% endfor %}
+    <section><h2>References — other publications</h2>
+        <p>These are fictional archive connections, not evidence or citations to real scholarship.</p>
+        <ol class="references">{% for reference in paper.references %}
+            <li>{% for researcher in reference.authors %}{{ researcher.name | escape }}{% if not loop.last %}, {% endif %}{% endfor %} ({{ reference.year }}). <a href="/papers/p/{{ reference.id | escape }}" rel="nofollow">{{ reference.title | escape }}</a>.</li>
+        {% endfor %}</ol>
+    </section>
+    <section><h2>Related publications</h2>
+        <ul class="references">{% for reference in paper.related %}
+            <li><a href="/papers/p/{{ reference.id | escape }}" rel="nofollow">{{ reference.title | escape }}</a></li>
+        {% endfor %}</ul>
+    </section>
+</article>
+<script src="/static/papers.js" defer></script>
+{% endblock research_content %}

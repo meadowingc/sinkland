@@ -49,6 +49,10 @@ jobs:
           bash -n scripts/install-pi.sh
           shellcheck scripts/install-pi.sh
           python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - uses: actions/cache@v4
+        with:
+          path: target/sinkland-paper-corpus
+          key: paper-corpus-v1-${{ hashFiles('corpus/papers/manifest.json', 'scripts/prepare-paper-corpus.py') }}
       - name: Build and test static ARM64 binary
         run: |
           cargo +stable test --locked --release --target aarch64-unknown-linux-musl
@@ -59,6 +63,7 @@ jobs:
           install -m 755 target/aarch64-unknown-linux-musl/release/sinkland package/sinkland
           cp -R assets/books assets/haikus.json package/assets/
           cp -R templates static package/
+          test ! -e package/assets/papers
           printf '%s\n' "$RELEASE_TAG" > package/VERSION
           python3 - <<'PY'
           import json
@@ -98,6 +103,7 @@ jobs:
           for path in blog/check haiku/check social social/user/check social/post/check social/media/check.png social/avatar/check.png social/banner/check.png static/hi.txt; do
             curl --fail --silent --show-error "http://127.0.0.1:43796/$path" > /dev/null
           done
+          python3 ../scripts/smoke-papers.py
       - name: Publish release
         run: |
           tar -C package -czf dist/sinkland-linux-arm64.tar.gz .

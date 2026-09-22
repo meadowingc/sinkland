@@ -1,0 +1,17 @@
+{% extends "papers/base.html.tera" %}
+{% block title %}{{ title | escape }} — Sinkland Papers{% endblock title %}
+{% block research_content %}
+<h1>{{ title | escape }}</h1>
+{% if author %}<p class="paper-meta">{{ author.affiliation | escape }}</p>{% endif %}
+{% for entry in results %}
+<article class="paper-card">
+    <h2><a href="/papers/p/{{ entry.id | escape }}" rel="nofollow">{{ entry.title | escape }}</a></h2>
+    <div class="paper-meta">{% for researcher in entry.authors %}<a href="/papers/author/{{ researcher.id | escape }}" rel="nofollow">{{ researcher.name | escape }}</a>{% if not loop.last %}, {% endif %}{% endfor %} · {{ entry.year }} · {{ entry.category_name | escape }}</div>
+    <p>An investigation of {{ entry.topic | escape }}.</p>
+</article>
+{% endfor %}
+<nav class="pagination" aria-label="Discovery pages">
+    {% if has_previous %}<a href="?q={{ query | urlencode | escape }}&amp;seed={{ seed | escape }}&amp;page={{ previous_page }}" rel="nofollow">Previous discoveries</a>{% endif %}
+    {% if has_next %}<a href="?q={{ query | urlencode | escape }}&amp;seed={{ seed | escape }}&amp;page={{ next_page }}" rel="nofollow">More discoveries</a>{% endif %}
+</nav>
+{% endblock research_content %}

@@ -1,5 +1,6 @@
 mod data;
 mod generators;
+mod papers;
 
 use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA};
 use generators::images::{
@@ -47,6 +48,7 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
 static BLOG_VISITS: AtomicUsize = AtomicUsize::new(1854446);
 static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(18137);
 static SOCIAL_VISITS: AtomicUsize = AtomicUsize::new(1259);
+static PAPER_VISITS: AtomicUsize = AtomicUsize::new(0);
 
 /// Visit counts for all sections
 #[derive(Clone)]
@@ -54,6 +56,7 @@ struct VisitCounts {
     blog: usize,
     haiku: usize,
     social: usize,
+    papers: usize,
     total: usize,
 }
 
@@ -62,11 +65,13 @@ fn increment_blog_visits() -> VisitCounts {
     let blog = BLOG_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
     let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
     let social = SOCIAL_VISITS.load(Ordering::Relaxed);
+    let papers = PAPER_VISITS.load(Ordering::Relaxed);
     VisitCounts {
         blog,
         haiku,
         social,
-        total: blog + haiku + social,
+        papers,
+        total: blog + haiku + social + papers,
     }
 }
 
@@ -75,11 +80,13 @@ fn increment_haiku_visits() -> VisitCounts {
     let blog = BLOG_VISITS.load(Ordering::Relaxed);
     let haiku = HAIKU_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
     let social = SOCIAL_VISITS.load(Ordering::Relaxed);
+    let papers = PAPER_VISITS.load(Ordering::Relaxed);
     VisitCounts {
         blog,
         haiku,
         social,
-        total: blog + haiku + social,
+        papers,
+        total: blog + haiku + social + papers,
     }
 }
 
@@ -88,11 +95,13 @@ fn increment_social_visits() -> VisitCounts {
     let blog = BLOG_VISITS.load(Ordering::Relaxed);
     let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
     let social = SOCIAL_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
+    let papers = PAPER_VISITS.load(Ordering::Relaxed);
     VisitCounts {
         blog,
         haiku,
         social,
-        total: blog + haiku + social,
+        papers,
+        total: blog + haiku + social + papers,
     }
 }
 
@@ -101,12 +110,19 @@ fn get_visit_counts() -> VisitCounts {
     let blog = BLOG_VISITS.load(Ordering::Relaxed);
     let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
     let social = SOCIAL_VISITS.load(Ordering::Relaxed);
+    let papers = PAPER_VISITS.load(Ordering::Relaxed);
     VisitCounts {
         blog,
         haiku,
         social,
-        total: blog + haiku + social,
+        papers,
+        total: blog + haiku + social + papers,
     }
+}
+
+fn increment_paper_visits() -> VisitCounts {
+    PAPER_VISITS.fetch_add(1, Ordering::Relaxed);
+    get_visit_counts()
 }
 
 /// Helper to insert visit counts into template context
@@ -114,6 +130,7 @@ fn insert_visit_counts(context: &mut Context, counts: &VisitCounts) {
     context.insert("blog_visits", &counts.blog);
     context.insert("haiku_visits", &counts.haiku);
     context.insert("social_visits", &counts.social);
+    context.insert("paper_visits", &counts.papers);
     context.insert("total_visits", &counts.total);
 }
 
@@ -697,12 +714,14 @@ fn social_banner(Path(username): Path<String>) -> Response {
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
+    Lazy::force(&generators::papers::MODEL);
     let app = Route::new()
         .nest("/static/", StaticFilesEndpoint::new("./static/"))
         .at("/", get(index))
         .at("/haiku/*slug", get(haiku_page))
         .at("/blog/*slug", get(scraper_trap))
         .at("/robots.txt", get(robots_txt))
+        .nest("/papers", papers::routes())
         // Social media routes
         .at("/social", get(social_feed))
         .at("/social/user/:username", get(social_user_profile))
