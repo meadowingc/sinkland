@@ -259,7 +259,7 @@ fn generate_banner_abstract<R: Rng>(rng: &mut R) -> RgbImage {
     img
 }
 
-fn simple_hash(s: &str) -> u64 {
+pub(crate) fn simple_hash(s: &str) -> u64 {
     let mut hash: u64 = 5381;
     for byte in s.bytes() {
         hash = hash.wrapping_mul(33).wrapping_add(byte as u64);

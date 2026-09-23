@@ -1,0 +1,54 @@
+{% extends "base.html.tera" %}
+
+{% block title %}{{ heading }}{% endblock title %}
+
+{% block extra_styles %}
+    .collection-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        gap: 16px;
+        margin: 25px 0;
+    }
+
+    .collection-card {
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #fafafa;
+        min-width: 0;
+    }
+
+    .collection-card h2 {
+        margin: 0 0 12px;
+        overflow-wrap: anywhere;
+    }
+
+    .collection-card a, .collection-refresh {
+        color: #176ca0;
+    }
+
+    .collection-preview {
+        color: #555;
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .collection-preview.haiku {
+        white-space: pre-line;
+        font-style: italic;
+    }
+{% endblock extra_styles %}
+
+{% block content %}
+    <h1>{{ heading }}</h1>
+    <p>{{ intro }}</p>
+    <div class="collection-grid">
+        {% for entry in entries %}
+        <article class="collection-card">
+            <h2><a href="{{ entry.url }}" rel="nofollow noopener noreferrer">{{ entry.title }}</a></h2>
+            <p class="collection-preview{% if is_haiku %} haiku{% endif %}">{% if is_haiku %}{{ entry.excerpt }}{% else %}{{ entry.excerpt | truncate(length=180) }}{% endif %}</p>
+        </article>
+        {% endfor %}
+    </div>
+    <p><a class="collection-refresh" href="{{ refresh_url }}" rel="nofollow noopener noreferrer">Explore another selection</a></p>
+{% endblock content %}

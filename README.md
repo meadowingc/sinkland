@@ -14,6 +14,15 @@ Sinkland does not mix unrelated real sites into its generated links.
 In blog paragraphs, inline links wrap short 2–4-word phrases with meaningful
 endpoints rather than isolated stopwords; they do not span sentence punctuation.
 Related-article links and friend-link probabilities are otherwise unchanged.
+The `/blog/blog-posts` and `/haiku/reflections` entrypoints show a fresh
+collection of links with previews on every visit. Linked blog and haiku pages
+repeat their generated content for the same URL; fictional
+social profile identity and each profile tab's posts repeat for the same username
+and tab. This uses versioned seeds, the same book/haiku assets and configured
+friends, and a fixed date range for their generated links. The homepage, social
+feed and search remain fresh on each visit, while footer visit counts remain live.
+Social post detail pages still generate fresh content independently of profile
+cards; their links do not identify a stored post.
 
 ## Local development
 
@@ -21,7 +30,8 @@ Related-article links and friend-link probabilities are otherwise unchanged.
 cargo run
 ```
 
-Visit `http://localhost:43796/`, `/blog/anything`, `/haiku/anything`, `/social`, or `/papers`.
+Visit `http://localhost:43796/`, `/blog/blog-posts`, `/haiku/reflections`,
+`/social`, or `/papers`.
 The default listener is `0.0.0.0:43796`; set `SINKLAND_BIND=127.0.0.1:43796` to
 listen only on loopback. This setting accepts an IP address and port, not a hostname.
 
@@ -84,8 +94,11 @@ in-page contents links, responsive measure, and print styling help navigation.
 
 Titles use fourteen structural forms and short category-conditioned phrases from
 the compiled transition model rather than a single repeated prefix. Blog related
-links and a subset of social posts also point to canonical papers within the
-archive.
+links and occasional social posts also point to canonical papers within the
+archive. Paper mentions are limited to a stable roughly one-in-eight subset of
+fictional profiles; around one in five posts by those profiles mentions a paper
+(about 2.5% of social posts overall). Their text varies by topic, author,
+category, and phrasing rather than following two fixed post patterns.
 
 ### Build-time paper corpus
 

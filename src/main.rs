@@ -24,8 +24,10 @@ use poem::{
     listener::TcpListener,
     web::{Html, Path},
 };
-use rand::Rng;
 use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
+use serde::Serialize;
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tera::{Context, Tera};
@@ -134,19 +136,34 @@ fn insert_visit_counts(context: &mut Context, counts: &VisitCounts) {
     context.insert("total_visits", &counts.total);
 }
 
+// A fixed date bound keeps generated links on seeded pages stable across visits.
+const SEEDED_LINK_EPOCH_LIMIT: u64 = 1_790_000_000;
+
+fn page_rng(kind: &str, identity: &str) -> ChaCha8Rng {
+    let seed = generators::images::simple_hash(&format!("sinkland-pages-v1:{kind}:{identity}"));
+    ChaCha8Rng::seed_from_u64(seed)
+}
+
+fn current_epoch_limit() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("System clock is before the Unix epoch")
+        .as_secs()
+}
+
 // Helper function to generate random paragraphs
-fn generate_random_paragraphs(
+fn generate_random_paragraphs<R: Rng>(
     num_paragraphs: usize,
     sentences_per_para_range: (usize, usize),
+    rng: &mut R,
 ) -> Vec<String> {
-    let mut rng = rand::thread_rng();
     (0..num_paragraphs)
         .map(|_| {
             let sentences_per_para =
                 rng.gen_range(sentences_per_para_range.0..=sentences_per_para_range.1);
             BOOK_DATA
                 .sentences
-                .choose_multiple(&mut rng, sentences_per_para)
+                .choose_multiple(rng, sentences_per_para)
                 .cloned()
                 .collect::<Vec<_>>()
                 .join(" ")
@@ -154,15 +171,10 @@ fn generate_random_paragraphs(
         .collect()
 }
 
-// Helper function to add random inline links to paragraphs
-fn add_inline_links_to_paragraphs(paragraphs: Vec<String>) -> Vec<String> {
-    let mut rng = rand::thread_rng();
-    add_inline_links_to_paragraphs_with_rng(paragraphs, &FRIENDS_LIST, &mut rng)
-}
-
 fn add_inline_links_to_paragraphs_with_rng<R: Rng>(
     paragraphs: Vec<String>,
     friends: &[String],
+    epoch_limit: u64,
     rng: &mut R,
 ) -> Vec<String> {
     paragraphs
@@ -211,7 +223,7 @@ fn add_inline_links_to_paragraphs_with_rng<R: Rng>(
             }
 
             selected.sort_unstable();
-            let links = generate_random_links(selected.len(), friends, rng);
+            let links = generate_random_links(selected.len(), friends, epoch_limit, rng);
             selected.truncate(links.len());
 
             let mut result = String::new();
@@ -290,6 +302,7 @@ fn extract_word_and_punctuation(word: &str) -> (String, String) {
 fn generate_random_links<R: Rng>(
     num_links: usize,
     friends: &[String],
+    epoch_limit: u64,
     rng: &mut R,
 ) -> Vec<(String, String)> {
     let num_links = num_links.min(BOOK_DATA.titles.len());
@@ -298,12 +311,7 @@ fn generate_random_links<R: Rng>(
         .titles
         .choose_multiple(rng, num_links)
         .map(|link_title| {
-            let random_timestamp = rng.gen_range(
-                0..std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-            );
+            let random_timestamp = rng.gen_range(0..epoch_limit);
 
             let days = random_timestamp / 86400;
             let year = 1970 + (days / 365);
@@ -361,21 +369,18 @@ fn maybe_add_paper_link<R: Rng>(links: &mut Vec<(String, String)>, rng: &mut R) 
     }
 }
 
-fn generate_haiku_links(num_links: usize) -> Vec<(String, String)> {
-    let mut rng = rand::thread_rng();
-
+fn generate_haiku_links<R: Rng>(
+    num_links: usize,
+    epoch_limit: u64,
+    rng: &mut R,
+) -> Vec<(String, String)> {
     let available_lines = HAIKU_DATA.lines_5.len().min(num_links);
 
     HAIKU_DATA
         .lines_5
-        .choose_multiple(&mut rng, available_lines)
+        .choose_multiple(rng, available_lines)
         .map(|link_text| {
-            let random_timestamp = rng.gen_range(
-                0..std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-            );
+            let random_timestamp = rng.gen_range(0..epoch_limit);
 
             let days = random_timestamp / 86400;
             let year = 1970 + (days / 365);
@@ -401,55 +406,130 @@ fn generate_haiku_links(num_links: usize) -> Vec<(String, String)> {
         .collect()
 }
 
-fn generate_random_haiku() -> String {
-    let mut rng = rand::thread_rng();
-
+fn generate_random_haiku<R: Rng>(rng: &mut R) -> String {
     let line1 = HAIKU_DATA
         .lines_5
-        .choose(&mut rng)
+        .choose(rng)
         .map(|s| s.as_str())
         .unwrap_or("A silent moment");
 
     let mut line3 = HAIKU_DATA
         .lines_5
-        .choose(&mut rng)
+        .choose(rng)
         .map(|s| s.as_str())
         .unwrap_or("Fades into the mist");
 
     while line3 == line1 && HAIKU_DATA.lines_5.len() > 1 {
         line3 = HAIKU_DATA
             .lines_5
-            .choose(&mut rng)
+            .choose(rng)
             .map(|s| s.as_str())
             .unwrap_or("Fades into the mist");
     }
 
     let line2 = HAIKU_DATA
         .lines_7
-        .choose(&mut rng)
+        .choose(rng)
         .map(|s| s.as_str())
         .unwrap_or("Between the pages of time");
 
     format!("{}\n{}\n{}", line1, line2, line3)
 }
 
+fn blog_lead<R: Rng>(rng: &mut R) -> (String, Vec<String>) {
+    let title = BOOK_DATA
+        .titles
+        .choose(rng)
+        .cloned()
+        .unwrap_or_else(|| "Mysterious Content".to_string());
+    let num_paragraphs = rng.gen_range(4..=5);
+    (
+        title,
+        generate_random_paragraphs(num_paragraphs, (3, 6), rng),
+    )
+}
+
+fn haiku_lead<R: Rng>(rng: &mut R) -> (String, String) {
+    let haiku = generate_random_haiku(rng);
+    let title = HAIKU_DATA
+        .lines_5
+        .choose(rng)
+        .map(|s| s.as_str())
+        .unwrap_or("Daily Haiku")
+        .to_string();
+    (title, haiku)
+}
+
+#[derive(Serialize)]
+struct CollectionEntry {
+    url: String,
+    title: String,
+    excerpt: String,
+}
+
+fn collection_entries<R: Rng>(
+    rng: &mut R,
+    section: &str,
+    preview: impl Fn(&mut ChaCha8Rng) -> (String, String),
+) -> Vec<CollectionEntry> {
+    (0..8)
+        .map(|_| {
+            let slug = format!("archive/{:016x}", rng.gen_range(0..u64::MAX));
+            let mut page_rng = page_rng(section, &slug);
+            let (title, excerpt) = preview(&mut page_rng);
+            CollectionEntry {
+                url: format!("/{section}/{slug}"),
+                title,
+                excerpt,
+            }
+        })
+        .collect()
+}
+
 // ============ BLOG/BOOK HANDLERS ============
 
 #[handler]
-fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
+fn blog_index() -> Result<Html<String>, poem::Error> {
+    let visit_counts = increment_blog_visits();
+    let entries = collection_entries(&mut rand::thread_rng(), "blog", |rng| {
+        let (title, paragraphs) = blog_lead(rng);
+        (
+            title,
+            paragraphs
+                .into_iter()
+                .next()
+                .expect("Blog lead generates at least four paragraphs"),
+        )
+    });
+    let mut context = Context::new();
+    context.insert("heading", "Classic Literature Archive");
+    context.insert(
+        "intro",
+        "A changing shelf of excerpts and stray observations. Open an entry to find its place in the archive.",
+    );
+    context.insert("entries", &entries);
+    context.insert("refresh_url", "/blog/blog-posts");
+    context.insert("is_haiku", &false);
+    insert_visit_counts(&mut context, &visit_counts);
+    TEMPLATES
+        .render("collection_index.html.tera", &context)
+        .map_err(InternalServerError)
+        .map(Html)
+}
+
+#[handler]
+fn scraper_trap(Path(slug): Path<String>) -> Result<Html<String>, poem::Error> {
     let visit_counts = increment_blog_visits();
 
-    let mut rng = rand::thread_rng();
+    let mut rng = page_rng("blog", &slug);
 
-    let title = BOOK_DATA
-        .titles
-        .choose(&mut rng)
-        .unwrap_or(&"Mysterious Content".to_string())
-        .clone();
-
-    let num_paragraphs = rng.gen_range(4..=5);
-    let paragraphs = generate_random_paragraphs(num_paragraphs, (3, 6));
-    let paragraphs = add_inline_links_to_paragraphs(paragraphs);
+    let (title, paragraphs) = blog_lead(&mut rng);
+    let paragraphs = add_inline_links_to_paragraphs_with_rng(
+        paragraphs,
+        &FRIENDS_LIST,
+        SEEDED_LINK_EPOCH_LIMIT,
+        &mut rng,
+    );
 
     // 20% chance of having images
     let images: Vec<(String, String)> = if rng.gen_bool(0.20) {
@@ -477,7 +557,8 @@ fn scraper_trap(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> 
     };
 
     let num_links = rng.gen_range(2..=7);
-    let mut links = generate_random_links(num_links, &FRIENDS_LIST, &mut rng);
+    let mut links =
+        generate_random_links(num_links, &FRIENDS_LIST, SEEDED_LINK_EPOCH_LIMIT, &mut rng);
     maybe_add_paper_link(&mut links, &mut rng);
 
     let mut context = Context::new();
@@ -498,16 +579,18 @@ fn index() -> Result<Html<String>, poem::Error> {
     let visit_counts = get_visit_counts();
 
     let mut rng = rand::thread_rng();
+    let epoch_limit = current_epoch_limit();
 
     let num_paragraphs = rng.gen_range(1..=2);
-    let paragraphs = generate_random_paragraphs(num_paragraphs, (2, 4));
-    let paragraphs = add_inline_links_to_paragraphs(paragraphs);
+    let paragraphs = generate_random_paragraphs(num_paragraphs, (2, 4), &mut rng);
+    let paragraphs =
+        add_inline_links_to_paragraphs_with_rng(paragraphs, &FRIENDS_LIST, epoch_limit, &mut rng);
 
     let num_links = rng.gen_range(5..=10);
-    let links = generate_random_links(num_links, &FRIENDS_LIST, &mut rng);
+    let links = generate_random_links(num_links, &FRIENDS_LIST, epoch_limit, &mut rng);
 
     let num_haiku_links = rng.gen_range(3..=5);
-    let haiku_links = generate_haiku_links(num_haiku_links);
+    let haiku_links = generate_haiku_links(num_haiku_links, epoch_limit, &mut rng);
 
     let mut context = Context::new();
     context.insert("paragraphs", &paragraphs);
@@ -528,22 +611,35 @@ async fn robots_txt() -> &'static str {
 }
 
 #[handler]
-fn haiku_page(Path(_slug): Path<String>) -> Result<Html<String>, poem::Error> {
+fn haiku_index() -> Result<Html<String>, poem::Error> {
+    let visit_counts = increment_haiku_visits();
+    let entries = collection_entries(&mut rand::thread_rng(), "haiku", haiku_lead);
+    let mut context = Context::new();
+    context.insert("heading", "Poetry & Reflections");
+    context.insert(
+        "intro",
+        "A few lines drawn from the collection. Each reflection stays where you found it, but the selection changes when you return.",
+    );
+    context.insert("entries", &entries);
+    context.insert("refresh_url", "/haiku/reflections");
+    context.insert("is_haiku", &true);
+    insert_visit_counts(&mut context, &visit_counts);
+    TEMPLATES
+        .render("collection_index.html.tera", &context)
+        .map_err(InternalServerError)
+        .map(Html)
+}
+
+#[handler]
+fn haiku_page(Path(slug): Path<String>) -> Result<Html<String>, poem::Error> {
     let visit_counts = increment_haiku_visits();
 
-    let mut rng = rand::thread_rng();
+    let mut rng = page_rng("haiku", &slug);
 
-    let haiku = generate_random_haiku();
-
-    let title = HAIKU_DATA
-        .lines_5
-        .choose(&mut rng)
-        .map(|s| s.as_str())
-        .unwrap_or("Daily Haiku")
-        .to_string();
+    let (title, haiku) = haiku_lead(&mut rng);
 
     let num_links = rng.gen_range(3..=7);
-    let links = generate_haiku_links(num_links);
+    let links = generate_haiku_links(num_links, SEEDED_LINK_EPOCH_LIMIT, &mut rng);
 
     let mut context = Context::new();
     context.insert("title", &title);
@@ -585,10 +681,8 @@ fn social_feed() -> Result<Html<String>, poem::Error> {
 fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poem::Error> {
     let visit_counts = increment_social_visits();
 
-    // Generate fresh random content on every page visit
-    let mut rng = rand::thread_rng();
-    let user = generate_user_random(&mut rng, &username);
-    let posts = generate_user_posts_random(&mut rng, &user, 10);
+    let user = generate_user_random(&mut page_rng("social-user", &username), &username);
+    let posts = generate_user_posts_random(&mut page_rng("social-posts", &username), &user, 10);
 
     let mut context = Context::new();
     context.insert("user", &user);
@@ -608,9 +702,16 @@ fn social_user_subpage(
 ) -> Result<Html<String>, poem::Error> {
     let visit_counts = increment_social_visits();
 
-    // Generate fresh random content on every page visit
-    let mut rng = rand::thread_rng();
-    let user = generate_user_random(&mut rng, &username);
+    let user = generate_user_random(&mut page_rng("social-user", &username), &username);
+    let mut rng = page_rng(
+        match subpage.as_str() {
+            "replies" => "social-replies",
+            "media" => "social-media",
+            "likes" => "social-likes",
+            _ => "social-posts",
+        },
+        &username,
+    );
 
     let mut context = Context::new();
     context.insert("user", &user);
@@ -760,13 +861,13 @@ fn social_banner(Path(username): Path<String>) -> Response {
 
 // ============ MAIN ============
 
-#[tokio::main]
-async fn main() -> Result<(), std::io::Error> {
-    Lazy::force(&generators::papers::MODEL);
-    let app = Route::new()
+fn routes() -> Route {
+    Route::new()
         .nest("/static/", StaticFilesEndpoint::new("./static/"))
         .at("/", get(index))
+        .at("/haiku/reflections", get(haiku_index))
         .at("/haiku/*slug", get(haiku_page))
+        .at("/blog/blog-posts", get(blog_index))
         .at("/blog/*slug", get(scraper_trap))
         .at("/robots.txt", get(robots_txt))
         .nest("/papers", papers::routes())
@@ -778,7 +879,13 @@ async fn main() -> Result<(), std::io::Error> {
         .at("/social/search/:query", get(social_search))
         .at("/social/media/:image_id", get(social_media_image))
         .at("/social/avatar/:username", get(social_avatar))
-        .at("/social/banner/:username", get(social_banner));
+        .at("/social/banner/:username", get(social_banner))
+}
+
+#[tokio::main]
+async fn main() -> Result<(), std::io::Error> {
+    Lazy::force(&generators::papers::MODEL);
+    let app = routes();
 
     let bind_address = match std::env::var("SINKLAND_BIND") {
         Ok(address) => address,
@@ -831,11 +938,11 @@ mod tests {
     fn links_without_friends_stay_inside_the_trap() {
         let mut rng = StdRng::seed_from_u64(42);
         for _ in 0..100 {
-            let links = generate_random_links(32, &[], &mut rng);
+            let links = generate_random_links(32, &[], SEEDED_LINK_EPOCH_LIMIT, &mut rng);
             assert!(!links.is_empty());
             assert!(links.iter().all(|(_, url)| url.starts_with("/blog/")));
         }
-        assert!(generate_random_links(0, &[], &mut rng).is_empty());
+        assert!(generate_random_links(0, &[], SEEDED_LINK_EPOCH_LIMIT, &mut rng).is_empty());
     }
 
     #[test]
@@ -848,7 +955,7 @@ mod tests {
         let mut total = 0;
         let mut friend_counts = [0, 0];
         for _ in 0..100 {
-            for (_, url) in generate_random_links(32, &friends, &mut rng) {
+            for (_, url) in generate_random_links(32, &friends, SEEDED_LINK_EPOCH_LIMIT, &mut rng) {
                 total += 1;
                 if url.starts_with("/blog/") {
                     continue;
@@ -901,9 +1008,13 @@ mod tests {
         let mut lengths = std::collections::BTreeSet::new();
         for seed in 0..200 {
             let mut rng = StdRng::seed_from_u64(seed);
-            let rendered =
-                add_inline_links_to_paragraphs_with_rng(vec![paragraph.to_owned()], &[], &mut rng)
-                    .remove(0);
+            let rendered = add_inline_links_to_paragraphs_with_rng(
+                vec![paragraph.to_owned()],
+                &[],
+                SEEDED_LINK_EPOCH_LIMIT,
+                &mut rng,
+            )
+            .remove(0);
             let mut restored = String::new();
             let mut rest = rendered.as_str();
             while let Some((before, after_open)) = rest.split_once("<a href=\"") {
@@ -939,12 +1050,108 @@ mod tests {
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
             assert_eq!(
-                add_inline_links_to_paragraphs_with_rng(vec![paragraph.to_owned()], &[], &mut rng,),
+                add_inline_links_to_paragraphs_with_rng(
+                    vec![paragraph.to_owned()],
+                    &[],
+                    SEEDED_LINK_EPOCH_LIMIT,
+                    &mut rng,
+                ),
                 vec![paragraph.to_owned()]
             );
         }
         for word in ["in", "as", "and", "they", "They,", "the", "with"] {
             assert!(!is_link_content_word(word), "{word}");
+        }
+    }
+
+    async fn page_content(path: &str) -> String {
+        use poem::Endpoint;
+        let request = poem::Request::builder().uri(path.parse().unwrap()).finish();
+        let response = routes().call(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{path}");
+        response
+            .into_body()
+            .into_string()
+            .await
+            .unwrap()
+            .split_once("<footer class=\"site-footer\">")
+            .unwrap()
+            .0
+            .to_owned()
+    }
+
+    #[tokio::test]
+    async fn blog_and_haiku_pages_repeat_by_url() {
+        for (first, second) in [
+            ("/blog/2026/09/21/first", "/blog/2026/09/21/second"),
+            ("/haiku/2026/09/21/first", "/haiku/2026/09/21/second"),
+        ] {
+            let original = page_content(first).await;
+            assert_ne!(original, page_content(second).await);
+            let _ = page_content("/").await;
+            assert_eq!(original, page_content(first).await);
+        }
+    }
+
+    #[tokio::test]
+    async fn collection_entrypoints_refresh_with_matching_stable_destinations() {
+        for (entrypoint, section) in [
+            ("/blog/blog-posts", "/blog/archive/"),
+            ("/haiku/reflections", "/haiku/archive/"),
+        ] {
+            let page = page_content(entrypoint).await;
+            assert_ne!(page, page_content(entrypoint).await);
+            let cards = page
+                .split("<article class=\"collection-card\">")
+                .skip(1)
+                .collect::<Vec<_>>();
+            assert_eq!(cards.len(), 8);
+            let mut urls = std::collections::HashSet::new();
+            for card in cards {
+                let (url, after_href) = card
+                    .split_once("<h2><a href=\"")
+                    .unwrap()
+                    .1
+                    .split_once('"')
+                    .unwrap();
+                let title = after_href
+                    .split_once('>')
+                    .unwrap()
+                    .1
+                    .split_once("</a>")
+                    .unwrap()
+                    .0;
+                assert!(url.starts_with(section), "{url}");
+                assert!(urls.insert(url));
+                let destination = page_content(url).await;
+                assert!(destination.contains(&format!("<h1>{title}</h1>")), "{url}");
+                assert_eq!(destination, page_content(url).await);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn social_profile_and_tabs_repeat_with_one_user_identity() {
+        let profile = page_content("/social/user/riverstone").await;
+        assert_eq!(profile, page_content("/social/user/riverstone/posts").await);
+        assert_ne!(profile, page_content("/social/user/mossfern").await);
+
+        let header = profile
+            .split_once("<div class=\"profile-tabs\">")
+            .unwrap()
+            .0;
+        for tab in ["replies", "media", "likes"] {
+            let path = format!("/social/user/riverstone/{tab}");
+            let original = page_content(&path).await;
+            assert_eq!(
+                header,
+                original
+                    .split_once("<div class=\"profile-tabs\">")
+                    .unwrap()
+                    .0
+            );
+            let _ = page_content("/social").await;
+            assert_eq!(original, page_content(&path).await);
         }
     }
 }

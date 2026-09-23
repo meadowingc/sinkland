@@ -119,6 +119,16 @@
         .links a:hover {
             text-decoration: underline;
         }
+
+        .post-content a.paper-link {
+            color: #0969a2;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .post-content a.paper-link:hover {
+            color: #075985;
+        }
         
         .footer {
             margin-top: 40px;
@@ -190,7 +200,7 @@
                 <span class="visit-stat">📚 Blog: <strong>{{ blog_visits | default(value=0) }}</strong></span> · 
                 <span class="visit-stat">🍃 Haiku: <strong>{{ haiku_visits | default(value=0) }}</strong></span> · 
                 <span class="visit-stat">💬 Social: <strong>{{ social_visits | default(value=0) }}</strong></span> ·
-                <span class="visit-stat">Papers: <strong>{{ paper_visits | default(value=0) }}</strong></span><br/>
+                <span class="visit-stat">📄 Papers: <strong>{{ paper_visits | default(value=0) }}</strong></span><br/>
                 <span class="visit-stat">🌐 Total: <strong>{{ total_visits | default(value=0) }}</strong></span>
             </p>
         </div>

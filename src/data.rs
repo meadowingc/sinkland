@@ -60,7 +60,7 @@ pub static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
 
     // Read all .txt files from the books directory
     let books_dir = "assets/books";
-    let book_files: Vec<_> = std::fs::read_dir(books_dir)
+    let mut book_files: Vec<_> = std::fs::read_dir(books_dir)
         .expect("Failed to read books directory")
         .filter_map(|entry| {
             let entry = entry.ok()?;
@@ -72,6 +72,7 @@ pub static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
             }
         })
         .collect();
+    book_files.sort();
 
     for file_path in &book_files {
         let content = match std::fs::read_to_string(file_path) {

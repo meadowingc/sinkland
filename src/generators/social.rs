@@ -1,7 +1,8 @@
 use crate::data::{BOOK_DATA, HAIKU_DATA, NAME_DATA, SHORT_PHRASES};
-use crate::generators::papers;
-use rand::Rng;
+use crate::generators::{images::simple_hash, papers};
 use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 use serde::Serialize;
 
 /// A social media user
@@ -336,8 +337,68 @@ fn extract_punctuation(word: &str) -> (String, String) {
     (prefix, suffix)
 }
 
-fn generate_post_content<R: Rng>(rng: &mut R) -> String {
-    let style = rng.gen_range(0..8);
+fn interested_in_papers(username: &str) -> bool {
+    let mut rng = ChaCha8Rng::seed_from_u64(simple_hash(&format!(
+        "sinkland-social-paper-interest-v1:{username}"
+    )));
+    rng.gen_ratio(1, 8)
+}
+
+fn generate_paper_post_content<R: Rng>(rng: &mut R) -> String {
+    let paper = papers::random_metadata(rng);
+    let link = format!(
+        r#"<a class="paper-link" href="/papers/p/{}" rel="nofollow noopener noreferrer">{}</a>"#,
+        paper.id,
+        tera::escape_html(&paper.title)
+    );
+    let topic = tera::escape_html(&paper.topic);
+    let author = tera::escape_html(&paper.authors[0].name);
+    let category = tera::escape_html(&paper.category_name.to_lowercase());
+    let aside = [
+        "I need to sit with this for a while.",
+        "The methods section sent me down another rabbit hole.",
+        "Still sorting out what I think about it.",
+        "It made me rethink my notes from last week.",
+        "Adding it to the pile of things to revisit.",
+        "There is more here than the title lets on.",
+    ]
+    .choose(rng)
+    .unwrap();
+    let question = [
+        "Anyone else working through this?",
+        "Where would you start with the follow-up?",
+        "What would you test next?",
+        "Am I reading too much into it?",
+        "How well does this travel to other settings?",
+    ]
+    .choose(rng)
+    .unwrap();
+
+    match rng.gen_range(0..10) {
+        0 => format!("Found {link} while looking into {topic}. {aside}"),
+        1 => format!("Reading list update: {link}. {question}"),
+        2 => format!(
+            "Has anyone read {link}? I'm looking at {topic} and could use a second opinion."
+        ),
+        3 => format!("{author} and colleagues have a {category} paper on {topic}: {link}. {aside}"),
+        4 => format!("The title of {link} caught my eye. {question}"),
+        5 => format!(
+            "Spent the afternoon with {link} ({year}). {aside}",
+            year = paper.year
+        ),
+        6 => format!("A detour from my usual reading, but {link} was worth it. {question}"),
+        7 => format!("Looking for work on {topic}? I just bookmarked {link}. {aside}"),
+        8 => format!("Notes to self: come back to {link} before diving further into {topic}."),
+        _ => format!("What do people make of {link}? {aside}"),
+    }
+}
+
+fn generate_post_content<R: Rng>(rng: &mut R, author: &User) -> String {
+    if interested_in_papers(&author.username) && rng.gen_ratio(1, 5) {
+        return generate_paper_post_content(rng);
+    }
+
+    let style = rng.gen_range(0..6);
 
     match style {
         0 => {
@@ -401,7 +462,7 @@ fn generate_post_content<R: Rng>(rng: &mut R) -> String {
             let noun = NAME_DATA.nouns.choose(rng).unwrap_or(&"existence");
             format!("{} {} matters", phrase, noun)
         }
-        5 => {
+        _ => {
             // Image caption style (especially for image posts)
             let captions = [
                 "no context needed",
@@ -414,20 +475,6 @@ fn generate_post_content<R: Rng>(rng: &mut R) -> String {
                 "no thoughts head empty",
             ];
             captions.choose(rng).unwrap_or(&"✨").to_string()
-        }
-        6 => {
-            let paper = papers::random_metadata(rng);
-            format!(
-                r#"Reading <a href="/papers/p/{}" rel="nofollow noopener noreferrer">{}</a> by {} and colleagues. The section on {} is worth a look."#,
-                paper.id, paper.title, paper.authors[0].name, paper.topic
-            )
-        }
-        _ => {
-            let paper = papers::random_metadata(rng);
-            format!(
-                r#"Has anyone replicated <a href="/papers/p/{}" rel="nofollow noopener noreferrer">{}</a>? The reported {} pattern is interesting."#,
-                paper.id, paper.title, paper.topic
-            )
         }
     }
 }
@@ -599,12 +646,13 @@ pub fn generate_post_random<R: Rng>(rng: &mut R) -> Post {
 
 /// Generate a random post, optionally forcing an image
 fn generate_post_random_with_image<R: Rng>(rng: &mut R, force_image: Option<bool>) -> Post {
-    // Generate author
     let username = generate_username(rng);
     let author = generate_user_random(rng, &username);
+    generate_post_for_author(rng, author, force_image)
+}
 
-    // Generate content and add hashtags
-    let base_content = generate_post_content(rng);
+fn generate_post_for_author<R: Rng>(rng: &mut R, author: User, force_image: Option<bool>) -> Post {
+    let base_content = generate_post_content(rng, &author);
     let content = if base_content.contains("/papers/p/") {
         if rng.gen_bool(0.5) {
             let count = rng.gen_range(1..=2);
@@ -699,11 +747,7 @@ pub fn generate_user_random<R: Rng>(rng: &mut R, username: &str) -> User {
 /// Generate posts for a user's profile (random version)
 pub fn generate_user_posts_random<R: Rng>(rng: &mut R, user: &User, count: usize) -> Vec<Post> {
     (0..count)
-        .map(|_| {
-            let mut post = generate_post_random(rng);
-            post.author = user.clone();
-            post
-        })
+        .map(|_| generate_post_for_author(rng, user.clone(), None))
         .collect()
 }
 
@@ -717,8 +761,7 @@ pub fn generate_user_replies_random<R: Rng>(
     let mut reply_targets = Vec::with_capacity(count);
 
     for _ in 0..count {
-        let mut post = generate_post_random(rng);
-        post.author = user.clone();
+        let post = generate_post_for_author(rng, user.clone(), None);
 
         // Generate a random user this is replying to
         let target_username = generate_username(rng);
@@ -744,11 +787,7 @@ pub fn generate_user_media_posts_random<R: Rng>(
     count: usize,
 ) -> Vec<Post> {
     (0..count)
-        .map(|_| {
-            let mut post = generate_post_random_with_image(rng, Some(true));
-            post.author = user.clone();
-            post
-        })
+        .map(|_| generate_post_for_author(rng, user.clone(), Some(true)))
         .collect()
 }
 
@@ -836,9 +875,10 @@ mod tests {
     fn paper_posts_link_to_canonical_internal_papers() {
         let mut rng = StdRng::seed_from_u64(91);
         let mut found = 0;
-        for _ in 0..300 {
+        for _ in 0..3000 {
             let post = generate_post_random(&mut rng);
             if let Some(start) = post.content.find("/papers/p/") {
+                assert!(interested_in_papers(&post.author.username));
                 let id_start = start + "/papers/p/".len();
                 let id_end = post.content[id_start..]
                     .find('"')
@@ -846,6 +886,10 @@ mod tests {
                     .unwrap();
                 let id = &post.content[id_start..id_end];
                 assert_eq!(id.parse::<papers::PaperId>().unwrap().to_string(), id);
+                assert!(
+                    post.content
+                        .contains("<a class=\"paper-link\" href=\"/papers/p/")
+                );
                 assert_eq!(
                     post.content.matches("<a ").count(),
                     post.content.matches("</a>").count()
@@ -853,6 +897,87 @@ mod tests {
                 found += 1;
             }
         }
-        assert!(found > 40);
+        assert!((30..=120).contains(&found), "{found} paper posts in 3000");
+    }
+
+    #[test]
+    fn paper_interest_applies_to_actual_profile_author_and_tabs() {
+        let interested = (0..2000)
+            .filter(|i| interested_in_papers(&format!("reader{i}")))
+            .count();
+        assert!((180..=320).contains(&interested), "{interested}/2000");
+
+        let eligible = (0..1000)
+            .map(|i| format!("reader{i}"))
+            .find(|name| interested_in_papers(name))
+            .unwrap();
+        let other = (0..1000)
+            .map(|i| format!("reader{i}"))
+            .find(|name| !interested_in_papers(name))
+            .unwrap();
+        let mut rng = StdRng::seed_from_u64(123);
+        for (username, has_interest) in [(eligible, true), (other, false)] {
+            let user = generate_user_random(&mut rng, &username);
+            let posts = generate_user_posts_random(&mut rng, &user, 2000);
+            let mentions = posts
+                .iter()
+                .filter(|post| post.content.contains("/papers/p/"))
+                .count();
+            assert!(posts.iter().all(|post| post.author.username == username));
+            if has_interest {
+                assert!((320..=480).contains(&mentions), "{mentions}/2000");
+            } else {
+                assert_eq!(mentions, 0);
+            }
+
+            let (replies, _) = generate_user_replies_random(&mut rng, &user, 100);
+            let media = generate_user_media_posts_random(&mut rng, &user, 100);
+            for post in replies.iter().chain(media.iter()) {
+                assert_eq!(post.author.username, username);
+                if !has_interest {
+                    assert!(!post.content.contains("/papers/p/"));
+                }
+            }
+            if has_interest {
+                assert!(
+                    replies
+                        .iter()
+                        .any(|post| post.content.contains("/papers/p/"))
+                );
+                assert!(media.iter().any(|post| post.content.contains("/papers/p/")));
+            }
+            assert!(media.iter().all(|post| post.has_image));
+        }
+    }
+
+    #[test]
+    fn paper_posts_use_varied_sentence_structures() {
+        let mut rng = StdRng::seed_from_u64(17);
+        let starters = [
+            "Found ",
+            "Reading list update: ",
+            "Has anyone read ",
+            "The title of ",
+            "Spent the afternoon with ",
+            "A detour from my usual reading, but ",
+            "Looking for work on ",
+            "Notes to self: ",
+            "What do people make of ",
+        ];
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..300 {
+            let content = generate_paper_post_content(&mut rng);
+            assert_eq!(content.matches("class=\"paper-link\"").count(), 1);
+            if let Some(starter) = starters
+                .iter()
+                .find(|starter| content.starts_with(**starter))
+            {
+                seen.insert(*starter);
+            } else {
+                assert!(content.contains(" and colleagues have a "), "{content}");
+                seen.insert("author-led");
+            }
+        }
+        assert_eq!(seen.len(), 10);
     }
 }
