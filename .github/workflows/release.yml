@@ -97,7 +97,7 @@ jobs:
             cat ../smoke.log
             exit 1
           fi
-          for path in blog/check haiku/check poetry poetry/couplet/000000000000002a poetry/triolet/000000000000002a poetry/sonnet-like/000000000000002a social social/user/check social/post/check social/media/check.png social/avatar/check.png social/banner/check.png static/hi.txt; do
+          for path in blog/check haiku/check poetry poetry/couplet/1986/07/01/000000000000002a poetry/triolet/1989/12/04/000000000000002a poetry/sonnet-like/2003/03/17/000000000000002a social social/user/check social/post/check social/media/check.png social/avatar/check.png social/banner/check.png static/hi.txt; do
             curl --fail --silent --show-error "http://127.0.0.1:43796/$path" > /dev/null
           done
           python3 ../scripts/smoke-papers.py

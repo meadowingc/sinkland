@@ -1,5 +1,5 @@
 use crate::{
-    TEMPLATES, collection_entries,
+    TEMPLATES, collection_entries, generated_poem_date,
     generators::poetry::{self, Form},
     haiku_lead, increment_poetry_visits, insert_visit_counts, page_rng,
 };
@@ -20,11 +20,19 @@ pub struct PoetryLink {
     pub preview: String,
 }
 
+pub(crate) fn poem_url(form: Form, id: u64) -> String {
+    let (year, month, day) = generated_poem_date(form.slug(), id);
+    format!(
+        "/poetry/{}/{year:04}/{month:02}/{day:02}/{id:016x}",
+        form.slug()
+    )
+}
+
 fn link(form: Form, id: u64) -> Result<PoetryLink, poem::Error> {
     let card = poetry::generate_card(form, id)
         .map_err(|error| InternalServerError(std::io::Error::other(error)))?;
     Ok(PoetryLink {
-        url: format!("/poetry/{}/{id:016x}", form.slug()),
+        url: poem_url(form, id),
         title: card.title,
         form: form.label(),
         preview: card.preview,
@@ -77,7 +85,9 @@ pub fn index() -> Result<Html<String>, poem::Error> {
 }
 
 #[handler]
-pub fn detail(Path((form_slug, id)): Path<(String, String)>) -> Result<Html<String>, poem::Error> {
+pub fn detail(
+    Path((form_slug, year, month, day, id)): Path<(String, String, String, String, String)>,
+) -> Result<Html<String>, poem::Error> {
     let form = Form::parse(&form_slug).ok_or_else(|| {
         NotFound(std::io::Error::new(
             std::io::ErrorKind::NotFound,
@@ -95,6 +105,12 @@ pub fn detail(Path((form_slug, id)): Path<(String, String)>) -> Result<Html<Stri
         )));
     }
     let seed = u64::from_str_radix(&id, 16).map_err(|error| NotFound(error))?;
+    if poem_url(form, seed) != format!("/poetry/{form_slug}/{year}/{month}/{day}/{id}") {
+        return Err(NotFound(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Poem not found",
+        )));
+    }
     let poem = poetry::generate(form, seed)
         .map_err(|error| InternalServerError(std::io::Error::other(error)))?;
     let mut context = Context::new();

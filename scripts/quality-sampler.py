@@ -39,6 +39,8 @@ USERNAMES = (
     "quietatlas", "smallharbor", "balcony_notes", "fieldrecording",
 )
 WORDS = re.compile(r"\b[\w']+\b", re.UNICODE)
+POEM_PATH = re.compile(r"/poetry/[a-z]+(?:-[a-z]+)*/[0-9]{4}/[0-9]{2}/[0-9]{2}/[0-9a-f]{16}")
+HAIKU_PATH = re.compile(r"/haiku/[0-9]{4}/[0-9]{2}/[0-9]{2}/[0-9a-f]{16}")
 
 
 def blog_ngrams(bodies):
@@ -363,9 +365,8 @@ class Sampler:
                 self.error("/poetry", "poetry card missing title/link/preview")
                 continue
             path = anchor.attrs.get("href", "")
-            haiku = re.fullmatch(r"/haiku/archive/[0-9a-f]{16}", path) is not None
-            if not haiku and not re.fullmatch(
-                    r"/poetry/[a-z]+(?:-[a-z]+)*/[0-9a-f]{16}", path):
+            haiku = HAIKU_PATH.fullmatch(path) is not None
+            if not haiku and not POEM_PATH.fullmatch(path):
                 self.error("/poetry", f"malformed poetry link: {path!r}")
                 continue
             content = self.stable(path, text(anchor))
@@ -401,9 +402,8 @@ class Sampler:
             self.probe_link(
                 path,
                 next((a for a in content.all("a")
-                      if re.fullmatch(r"/poetry/[a-z]+(?:-[a-z]+)*/[0-9a-f]{16}",
-                                      a.attrs.get("href", ""))), None),
-                r"/poetry/[a-z]+(?:-[a-z]+)*/[0-9a-f]{16}",
+                      if POEM_PATH.fullmatch(a.attrs.get("href", ""))), None),
+                POEM_PATH.pattern,
                 "missing related poetry link",
             )
 

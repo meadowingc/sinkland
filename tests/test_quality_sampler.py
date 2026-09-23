@@ -104,8 +104,8 @@ class QualitySamplerTests(unittest.TestCase):
         self.assertEqual(len(opener.calls), 5)
 
     def test_poetry_sample_checks_stable_previews_and_related_links(self):
-        poem_path = "/poetry/couplet/000000000000002a"
-        neighbor = "/poetry/quatrain/0000000000000001"
+        poem_path = "/poetry/couplet/2012/03/18/000000000000002a"
+        neighbor = "/poetry/quatrain/2013/04/19/0000000000000001"
         listing = page(
             '<h1>Poetry Archive</h1><article class="poetry-card">'
             f'<a href="{poem_path}">A lantern</a>'
@@ -137,7 +137,7 @@ class QualitySamplerTests(unittest.TestCase):
         self.assertIn("preview differs", " ".join(run.errors))
 
     def test_poetry_sample_accepts_haiku_cards_with_matching_destinations(self):
-        path = "/haiku/archive/000000000000002a"
+        path = "/haiku/2012/03/18/000000000000002a"
         neighbor = "/haiku/2025/01/02/a-silent-moment"
         verse = "A small lantern glows\nBeneath the paper window\nThe far river rests"
         listing = page(

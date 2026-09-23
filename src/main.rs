@@ -164,6 +164,19 @@ fn page_rng(kind: &str, identity: &str) -> ChaCha8Rng {
     ChaCha8Rng::seed_from_u64(seed)
 }
 
+fn generated_poem_date(kind: &str, identity: u64) -> (u16, u8, u8) {
+    let mut rng = page_rng("poem-date", &format!("{kind}/{identity:016x}"));
+    let year: u16 = rng.gen_range(1970..=2026);
+    let month: u8 = rng.gen_range(1..=12);
+    let days = match month {
+        2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    (year, month, rng.gen_range(1..=days))
+}
+
 fn current_epoch_limit() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -511,7 +524,13 @@ fn collection_entries<R: Rng>(
 ) -> Vec<CollectionEntry> {
     (0..8)
         .map(|_| {
-            let slug = format!("archive/{:016x}", rng.gen_range(0..u64::MAX));
+            let id = rng.gen_range(0..u64::MAX);
+            let slug = if section == "haiku" {
+                let (year, month, day) = generated_poem_date("haiku", id);
+                format!("{year:04}/{month:02}/{day:02}/{id:016x}")
+            } else {
+                format!("archive/{id:016x}")
+            };
             let mut page_rng = page_rng(section, &slug);
             let (title, excerpt) = preview(&mut page_rng);
             CollectionEntry {
@@ -982,7 +1001,7 @@ fn routes() -> Route {
         .at("/haiku/reflections", get(haiku_index))
         .at("/haiku/*slug", get(haiku_page))
         .at("/poetry", get(poetry::index))
-        .at("/poetry/:form/:id", get(poetry::detail))
+        .at("/poetry/:form/:year/:month/:day/:id", get(poetry::detail))
         .at("/blog/blog-posts", get(blog_index))
         .at("/blog/*slug", get(scraper_trap))
         .at("/tags", get(tags::index))
@@ -1239,7 +1258,7 @@ mod tests {
     async fn collection_entrypoints_refresh_with_matching_stable_destinations() {
         for (entrypoint, section) in [
             ("/blog/blog-posts", "/blog/archive/"),
-            ("/haiku/reflections", "/haiku/archive/"),
+            ("/haiku/reflections", "/haiku/"),
         ] {
             let page = page_content(entrypoint).await;
             assert_ne!(page, page_content(entrypoint).await);
@@ -1265,6 +1284,16 @@ mod tests {
                     .unwrap()
                     .0;
                 assert!(url.starts_with(section), "{url}");
+                if section == "/haiku/" {
+                    let parts = url.split('/').collect::<Vec<_>>();
+                    assert_eq!(parts.len(), 6);
+                    let id = u64::from_str_radix(parts[5], 16).unwrap();
+                    let (year, month, day) = generated_poem_date("haiku", id);
+                    assert_eq!(
+                        url,
+                        format!("/haiku/{year:04}/{month:02}/{day:02}/{id:016x}")
+                    );
+                }
                 assert!(urls.insert(url.clone()));
                 let destination = page_content(&url).await;
                 assert!(destination.contains(&format!("<h1>{title}</h1>")), "{url}");
@@ -1441,8 +1470,16 @@ mod tests {
                 .0;
             let destination = page_content(&url).await;
             assert!(destination.contains(&format!("<h1>{title}</h1>")));
-            if url.starts_with("/haiku/archive/") {
+            if url.starts_with("/haiku/") {
                 assert!(card.contains("class=\"poetry-preview haiku\""), "{url}");
+                let parts = url.split('/').collect::<Vec<_>>();
+                assert_eq!(parts.len(), 6);
+                let id = u64::from_str_radix(parts[5], 16).unwrap();
+                let (year, month, day) = generated_poem_date("haiku", id);
+                assert_eq!(
+                    url,
+                    format!("/haiku/{year:04}/{month:02}/{day:02}/{id:016x}")
+                );
                 assert!(
                     destination.contains(&format!("<div class=\"haiku\">{preview}</div>")),
                     "{url}"
@@ -1450,9 +1487,14 @@ mod tests {
                 haikus += 1;
             } else {
                 let parts = url.split('/').collect::<Vec<_>>();
-                assert_eq!(parts.len(), 4);
+                assert_eq!(parts.len(), 7);
                 assert_eq!(parts[1], "poetry");
-                assert_eq!(parts[3].len(), 16);
+                assert_eq!(parts[6].len(), 16);
+                let id = u64::from_str_radix(parts[6], 16).unwrap();
+                assert_eq!(
+                    url,
+                    poetry::poem_url(generators::poetry::Form::parse(parts[2]).unwrap(), id)
+                );
                 assert!(forms.insert(parts[2].to_owned()));
                 assert!(
                     destination.contains(&format!("<span class=\"poem-line\">{preview}</span>")),
@@ -1503,7 +1545,7 @@ mod tests {
 
     #[tokio::test]
     async fn related_poetry_links_show_only_titles() {
-        let detail = page_content("/poetry/couplet/000000000000002a").await;
+        let detail = page_content(&poetry::poem_url(generators::poetry::Form::Couplet, 42)).await;
         let after_title = detail.split_once("</h1>").unwrap().1;
         assert!(
             after_title
@@ -1531,11 +1573,20 @@ mod tests {
     #[tokio::test]
     async fn poetry_invalid_forms_and_seeds_are_not_found() {
         use poem::Endpoint;
+        let canonical = poetry::poem_url(generators::poetry::Form::Couplet, 42);
+        let (year, _, _) = generated_poem_date("couplet", 42);
+        let noncanonical_date = canonical.replacen(&format!("/{year:04}/"), "/0000/", 1);
         for path in [
-            "/poetry/unknown/000000000000002a",
-            "/poetry/couplet/xyz",
-            "/poetry/couplet/000000000000002A",
-            "/poetry/couplet/000000000000002a/extra",
+            "/poetry/unknown/2012/01/01/000000000000002a",
+            "/poetry/couplet/2012/01/01/xyz",
+            "/poetry/couplet/2012/01/01/000000000000002A",
+            "/poetry/couplet/2012/01/01/000000000000002a/extra",
+            "/poetry/couplet/2012/00/01/000000000000002a",
+            "/poetry/couplet/2012/01/32/000000000000002a",
+            "/poetry/couplet/2012/1/01/000000000000002a",
+            "/poetry/couplet/2012/01/01/000000000000002a",
+            &noncanonical_date,
+            "/poetry/couplet/000000000000002a",
         ] {
             let request = poem::Request::builder().uri(path.parse().unwrap()).finish();
             let response = routes().get_response(request).await;
@@ -1543,6 +1594,28 @@ mod tests {
         }
         let haiku = page_content("/haiku/2026/09/21/first").await;
         assert!(haiku.contains("class=\"haiku\""));
+    }
+
+    #[test]
+    fn generated_poem_dates_are_valid_and_repeatable() {
+        for kind in ["haiku", "couplet", "sonnet-like"] {
+            for id in 0..512 {
+                let (year, month, day) = generated_poem_date(kind, id);
+                assert!((1970..=2026).contains(&year));
+                assert!((1..=12).contains(&month));
+                let days = match month {
+                    2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
+                    2 => 28,
+                    4 | 6 | 9 | 11 => 30,
+                    _ => 31,
+                };
+                assert!((1..=days).contains(&day));
+                assert_eq!((year, month, day), generated_poem_date(kind, id));
+            }
+        }
+        assert_eq!(generated_poem_date("couplet", 42), (1986, 7, 1));
+        assert_eq!(generated_poem_date("triolet", 42), (1989, 12, 4));
+        assert_eq!(generated_poem_date("sonnet-like", 42), (2003, 3, 17));
     }
 
     #[test]
@@ -1558,7 +1631,7 @@ mod tests {
         context.insert(
             "related",
             &vec![poetry::PoetryLink {
-                url: "/poetry/couplet/000000000000002a?x=\"bad\"".to_owned(),
+                url: "/poetry/couplet/2012/01/01/000000000000002a?x=\"bad\"".to_owned(),
                 title: "<script>neighbor</script>".to_owned(),
                 form: "Couplet",
                 preview: String::new(),
