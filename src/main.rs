@@ -3,6 +3,7 @@ mod generators;
 mod papers;
 
 use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA};
+use generators::blog;
 use generators::images::{
     generate_avatar_from_seed, generate_banner_from_seed, generate_image_from_seed,
 };
@@ -151,24 +152,24 @@ fn current_epoch_limit() -> u64 {
         .as_secs()
 }
 
-// Helper function to generate random paragraphs
-fn generate_random_paragraphs<R: Rng>(
-    num_paragraphs: usize,
-    sentences_per_para_range: (usize, usize),
-    rng: &mut R,
-) -> Vec<String> {
-    (0..num_paragraphs)
-        .map(|_| {
-            let sentences_per_para =
-                rng.gen_range(sentences_per_para_range.0..=sentences_per_para_range.1);
-            BOOK_DATA
-                .sentences
-                .choose_multiple(rng, sentences_per_para)
-                .cloned()
-                .collect::<Vec<_>>()
-                .join(" ")
-        })
-        .collect()
+#[derive(Debug, PartialEq, Serialize)]
+struct InlinePart {
+    text: String,
+    url: Option<String>,
+    trailing: String,
+}
+
+#[derive(Serialize)]
+struct BlogSection {
+    heading: Option<String>,
+    paragraphs: Vec<Vec<InlinePart>>,
+}
+
+#[derive(Serialize)]
+struct BlogLink {
+    title: String,
+    url: String,
+    preview: Option<String>,
 }
 
 fn add_inline_links_to_paragraphs_with_rng<R: Rng>(
@@ -176,7 +177,7 @@ fn add_inline_links_to_paragraphs_with_rng<R: Rng>(
     friends: &[String],
     epoch_limit: u64,
     rng: &mut R,
-) -> Vec<String> {
+) -> Vec<Vec<InlinePart>> {
     paragraphs
         .into_iter()
         .map(|paragraph| {
@@ -188,13 +189,21 @@ fn add_inline_links_to_paragraphs_with_rng<R: Rng>(
             };
 
             if num_links == 0 {
-                return paragraph;
+                return vec![InlinePart {
+                    text: paragraph,
+                    url: None,
+                    trailing: String::new(),
+                }];
             }
 
             let words: Vec<&str> = paragraph.split_whitespace().collect();
 
             if words.len() < 10 {
-                return paragraph;
+                return vec![InlinePart {
+                    text: paragraph,
+                    url: None,
+                    trailing: String::new(),
+                }];
             }
 
             let mut candidates = (2..words.len().saturating_sub(2))
@@ -226,13 +235,10 @@ fn add_inline_links_to_paragraphs_with_rng<R: Rng>(
             let links = generate_random_links(selected.len(), friends, epoch_limit, rng);
             selected.truncate(links.len());
 
-            let mut result = String::new();
+            let mut result = Vec::new();
             let mut link_index = 0;
             let mut word_index = 0;
             while word_index < words.len() {
-                if !result.is_empty() {
-                    result.push(' ');
-                }
                 if let Some(&(start, end)) = selected
                     .get(link_index)
                     .filter(|&&(start, _)| start == word_index)
@@ -244,14 +250,19 @@ fn add_inline_links_to_paragraphs_with_rng<R: Rng>(
                         .chain(std::iter::once(last_word.as_str()))
                         .collect::<Vec<_>>()
                         .join(" ");
-                    result.push_str(&format!(
-                        r#"<a href="{}" rel="nofollow noopener noreferrer">{}</a>{}"#,
-                        links[link_index].1, phrase, punctuation
-                    ));
+                    result.push(InlinePart {
+                        text: phrase,
+                        url: Some(links[link_index].1.clone()),
+                        trailing: punctuation,
+                    });
                     link_index += 1;
                     word_index = end;
                 } else {
-                    result.push_str(words[word_index]);
+                    result.push(InlinePart {
+                        text: words[word_index].to_owned(),
+                        url: None,
+                        trailing: String::new(),
+                    });
                     word_index += 1;
                 }
             }
@@ -299,18 +310,23 @@ fn extract_word_and_punctuation(word: &str) -> (String, String) {
     (clean_word, punctuation)
 }
 
+fn blog_url<R: Rng>(rng: &mut R) -> String {
+    format!("/blog/archive/{:016x}", rng.gen_range(0..u64::MAX))
+}
+
 fn generate_random_links<R: Rng>(
     num_links: usize,
     friends: &[String],
     epoch_limit: u64,
     rng: &mut R,
 ) -> Vec<(String, String)> {
-    let num_links = num_links.min(BOOK_DATA.titles.len());
-
-    BOOK_DATA
-        .titles
-        .choose_multiple(rng, num_links)
-        .map(|link_title| {
+    (0..num_links)
+        .map(|_| {
+            let url = blog_url(rng);
+            let title = blog::title_for(url.strip_prefix("/blog/").unwrap());
+            if friends.is_empty() || !rng.gen_bool(0.25) {
+                return (title, url);
+            }
             let random_timestamp = rng.gen_range(0..epoch_limit);
 
             let days = random_timestamp / 86400;
@@ -319,42 +335,37 @@ fn generate_random_links<R: Rng>(
             let month = (day_of_year / 30).min(11) + 1;
             let day = (day_of_year % 30) + 1;
 
-            if !friends.is_empty() && rng.gen_bool(0.25) {
-                // Friend trap link with generated path
-                let clean_slug: String = link_title
-                    .to_lowercase()
-                    .chars()
-                    .map(|c| if c.is_alphanumeric() { c } else { '-' })
-                    .collect::<String>()
-                    .split('-')
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<_>>()
-                    .join("-");
+            let clean_slug: String = title
+                .to_lowercase()
+                .chars()
+                .map(|c| if c.is_alphanumeric() { c } else { '-' })
+                .collect::<String>()
+                .split('-')
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join("-");
 
-                let friend_url = friends.choose(rng).unwrap();
-                let external_url = format!(
-                    "{}/{:04}-{:02}-{:02}--{}/",
-                    friend_url.trim_end_matches('/'),
-                    year,
-                    month,
-                    day,
-                    clean_slug
-                );
-                (link_title.clone(), external_url)
-            } else {
-                // Internal trap link
-                let slug = link_title
-                    .to_lowercase()
-                    .trim()
-                    .replace(' ', "-")
-                    .replace('.', "");
-                let url_slug = urlencoding::encode(&slug).into_owned();
-
-                (
-                    link_title.clone(),
-                    format!("/blog/{:04}/{:02}/{:02}/{}", year, month, day, url_slug),
-                )
-            }
+            let friend_url = friends.choose(rng).unwrap();
+            let external_url = format!(
+                "{}/{:04}-{:02}-{:02}--{}/",
+                friend_url.trim_end_matches('/'),
+                year,
+                month,
+                day,
+                clean_slug
+            );
+            (
+                [
+                    "From a neighboring notebook",
+                    "Another trail to follow",
+                    "A note from elsewhere",
+                    "One more place to wander",
+                ]
+                .choose(rng)
+                .unwrap()
+                .to_string(),
+                external_url,
+            )
         })
         .collect()
 }
@@ -436,19 +447,6 @@ fn generate_random_haiku<R: Rng>(rng: &mut R) -> String {
     format!("{}\n{}\n{}", line1, line2, line3)
 }
 
-fn blog_lead<R: Rng>(rng: &mut R) -> (String, Vec<String>) {
-    let title = BOOK_DATA
-        .titles
-        .choose(rng)
-        .cloned()
-        .unwrap_or_else(|| "Mysterious Content".to_string());
-    let num_paragraphs = rng.gen_range(4..=5);
-    (
-        title,
-        generate_random_paragraphs(num_paragraphs, (3, 6), rng),
-    )
-}
-
 fn haiku_lead<R: Rng>(rng: &mut R) -> (String, String) {
     let haiku = generate_random_haiku(rng);
     let title = HAIKU_DATA
@@ -491,16 +489,19 @@ fn collection_entries<R: Rng>(
 #[handler]
 fn blog_index() -> Result<Html<String>, poem::Error> {
     let visit_counts = increment_blog_visits();
-    let entries = collection_entries(&mut rand::thread_rng(), "blog", |rng| {
-        let (title, paragraphs) = blog_lead(rng);
-        (
-            title,
-            paragraphs
-                .into_iter()
-                .next()
-                .expect("Blog lead generates at least four paragraphs"),
-        )
-    });
+    let mut rng = rand::thread_rng();
+    let entries = (0..8)
+        .map(|_| {
+            let url = blog_url(&mut rng);
+            let post = blog::generate(url.strip_prefix("/blog/").unwrap());
+            let excerpt = post.excerpt().to_owned();
+            CollectionEntry {
+                url,
+                title: post.title,
+                excerpt,
+            }
+        })
+        .collect::<Vec<_>>();
     let mut context = Context::new();
     context.insert("heading", "Blog");
     context.insert("intro", "Explore a selection of random blog posts.");
@@ -518,49 +519,51 @@ fn blog_index() -> Result<Html<String>, poem::Error> {
 fn scraper_trap(Path(slug): Path<String>) -> Result<Html<String>, poem::Error> {
     let visit_counts = increment_blog_visits();
 
-    let mut rng = page_rng("blog", &slug);
-
-    let (title, paragraphs) = blog_lead(&mut rng);
-    let paragraphs = add_inline_links_to_paragraphs_with_rng(
-        paragraphs,
-        &FRIENDS_LIST,
-        SEEDED_LINK_EPOCH_LIMIT,
-        &mut rng,
-    );
+    let blog::Post {
+        title,
+        sections: post_sections,
+        kind,
+        reading_minutes,
+    } = blog::generate(&slug);
+    let mut link_rng = page_rng("blog-links", &slug);
+    let sections = post_sections
+        .into_iter()
+        .map(|section| BlogSection {
+            heading: section.heading,
+            paragraphs: add_inline_links_to_paragraphs_with_rng(
+                section.paragraphs,
+                &FRIENDS_LIST,
+                SEEDED_LINK_EPOCH_LIMIT,
+                &mut link_rng,
+            ),
+        })
+        .collect::<Vec<_>>();
 
     // 20% chance of having images
-    let images: Vec<(String, String)> = if rng.gen_bool(0.20) {
-        // 90% single, 7% two, 3% three
-        // let roll: f64 = rng.gen_range(0.0..1.0);
-        // let num_images = if roll < 0.90 { 1 } else if roll < 0.97 { 2 } else { 3 };
-
-        let num_images = 1;
-
-        (0..num_images)
-            .map(|_| {
-                let seed: u64 = rng.gen_range(0..u64::MAX);
-                let url = format!("/social/media/{}.png", seed);
-                // Generate random alt text from book titles
-                let alt = BOOK_DATA
-                    .titles
-                    .choose(&mut rng)
-                    .cloned()
-                    .unwrap_or_else(|| "Illustration".to_string());
-                (url, alt)
-            })
-            .collect()
+    let mut image_rng = page_rng("blog-images", &slug);
+    let images: Vec<(String, String)> = if image_rng.gen_bool(0.20) {
+        vec![(
+            format!("/social/media/{}.png", image_rng.gen_range(0..u64::MAX)),
+            format!("Illustration for {title}"),
+        )]
     } else {
         Vec::new()
     };
 
-    let num_links = rng.gen_range(2..=7);
-    let mut links =
-        generate_random_links(num_links, &FRIENDS_LIST, SEEDED_LINK_EPOCH_LIMIT, &mut rng);
-    maybe_add_paper_link(&mut links, &mut rng);
+    let num_links = link_rng.gen_range(2..=7);
+    let mut links = generate_random_links(
+        num_links,
+        &FRIENDS_LIST,
+        SEEDED_LINK_EPOCH_LIMIT,
+        &mut link_rng,
+    );
+    maybe_add_paper_link(&mut links, &mut link_rng);
 
     let mut context = Context::new();
     context.insert("title", &title);
-    context.insert("paragraphs", &paragraphs);
+    context.insert("kind", &kind);
+    context.insert("reading_minutes", &reading_minutes);
+    context.insert("sections", &sections);
     context.insert("images", &images);
     context.insert("links", &links);
     insert_visit_counts(&mut context, &visit_counts);
@@ -578,20 +581,24 @@ fn index() -> Result<Html<String>, poem::Error> {
     let mut rng = rand::thread_rng();
     let epoch_limit = current_epoch_limit();
 
-    let num_paragraphs = rng.gen_range(1..=2);
-    let paragraphs = generate_random_paragraphs(num_paragraphs, (2, 4), &mut rng);
-    let paragraphs =
-        add_inline_links_to_paragraphs_with_rng(paragraphs, &FRIENDS_LIST, epoch_limit, &mut rng);
-
     let num_links = rng.gen_range(5..=10);
     let links = generate_random_links(num_links, &FRIENDS_LIST, epoch_limit, &mut rng);
+    let featured_posts = links
+        .into_iter()
+        .map(|(title, url)| BlogLink {
+            preview: url
+                .strip_prefix("/blog/")
+                .map(|slug| blog::generate(slug).excerpt().to_owned()),
+            title,
+            url,
+        })
+        .collect::<Vec<_>>();
 
     let num_haiku_links = rng.gen_range(3..=5);
     let haiku_links = generate_haiku_links(num_haiku_links, epoch_limit, &mut rng);
 
     let mut context = Context::new();
-    context.insert("paragraphs", &paragraphs);
-    context.insert("links", &links);
+    context.insert("featured_posts", &featured_posts);
     context.insert("haiku_links", &haiku_links);
 
     insert_visit_counts(&mut context, &visit_counts);
@@ -938,6 +945,12 @@ mod tests {
             let links = generate_random_links(32, &[], SEEDED_LINK_EPOCH_LIMIT, &mut rng);
             assert!(!links.is_empty());
             assert!(links.iter().all(|(_, url)| url.starts_with("/blog/")));
+            for (title, url) in links {
+                assert_eq!(
+                    title,
+                    blog::generate(url.strip_prefix("/blog/").unwrap()).title
+                );
+            }
         }
         assert!(generate_random_links(0, &[], SEEDED_LINK_EPOCH_LIMIT, &mut rng).is_empty());
     }
@@ -1012,29 +1025,31 @@ mod tests {
                 &mut rng,
             )
             .remove(0);
-            let mut restored = String::new();
-            let mut rest = rendered.as_str();
-            while let Some((before, after_open)) = rest.split_once("<a href=\"") {
-                restored.push_str(before);
-                let (url_and_attributes, after_attributes) = after_open.split_once('>').unwrap();
-                assert!(url_and_attributes.starts_with("/blog/"));
-                let (text, after_close) = after_attributes.split_once("</a>").unwrap();
-                let words = text.split_whitespace().collect::<Vec<_>>();
-                assert!((2..=4).contains(&words.len()), "{text}");
-                assert!(is_link_content_word(words[0]), "{text}");
-                assert!(is_link_content_word(words[words.len() - 1]), "{text}");
+            let restored = rendered
+                .iter()
+                .map(|part| format!("{}{}", part.text, part.trailing))
+                .collect::<Vec<_>>()
+                .join(" ");
+            for part in rendered.iter().filter(|part| part.url.is_some()) {
+                assert!(part.url.as_ref().unwrap().starts_with("/blog/"));
+                let words = part.text.split_whitespace().collect::<Vec<_>>();
+                assert!((2..=4).contains(&words.len()), "{}", part.text);
+                assert!(is_link_content_word(words[0]), "{}", part.text);
+                assert!(
+                    is_link_content_word(words[words.len() - 1]),
+                    "{}",
+                    part.text
+                );
                 assert!(
                     words[..words.len() - 1]
                         .iter()
                         .all(|word| !ends_phrase_boundary(word)),
-                    "{text}"
+                    "{}",
+                    part.text
                 );
-                restored.push_str(text);
                 seen += 1;
                 lengths.insert(words.len());
-                rest = after_close;
             }
-            restored.push_str(rest);
             assert_eq!(restored, paragraph);
         }
         assert!(seen > 100);
@@ -1046,14 +1061,21 @@ mod tests {
         let paragraph = "In as and they in as and they in as and they in as and they.";
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
+            let parts = add_inline_links_to_paragraphs_with_rng(
+                vec![paragraph.to_owned()],
+                &[],
+                SEEDED_LINK_EPOCH_LIMIT,
+                &mut rng,
+            )
+            .remove(0);
+            assert!(parts.iter().all(|part| part.url.is_none()));
             assert_eq!(
-                add_inline_links_to_paragraphs_with_rng(
-                    vec![paragraph.to_owned()],
-                    &[],
-                    SEEDED_LINK_EPOCH_LIMIT,
-                    &mut rng,
-                ),
-                vec![paragraph.to_owned()]
+                parts
+                    .iter()
+                    .map(|part| part.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                paragraph
             );
         }
         for word in ["in", "as", "and", "they", "They,", "the", "with"] {
@@ -1105,12 +1127,13 @@ mod tests {
             assert_eq!(cards.len(), 8);
             let mut urls = std::collections::HashSet::new();
             for card in cards {
-                let (url, after_href) = card
+                let (encoded_url, after_href) = card
                     .split_once("<h2><a href=\"")
                     .unwrap()
                     .1
                     .split_once('"')
                     .unwrap();
+                let url = encoded_url.replace("&#x2F;", "/");
                 let title = after_href
                     .split_once('>')
                     .unwrap()
@@ -1119,12 +1142,85 @@ mod tests {
                     .unwrap()
                     .0;
                 assert!(url.starts_with(section), "{url}");
-                assert!(urls.insert(url));
-                let destination = page_content(url).await;
+                assert!(urls.insert(url.clone()));
+                let destination = page_content(&url).await;
                 assert!(destination.contains(&format!("<h1>{title}</h1>")), "{url}");
-                assert_eq!(destination, page_content(url).await);
+                if section == "/blog/archive/" {
+                    let slug = url.strip_prefix("/blog/").unwrap();
+                    let excerpt = blog::generate(slug).excerpt().to_owned();
+                    assert!(card.contains(&excerpt[..80]), "{url}");
+                    let opening = excerpt
+                        .split_whitespace()
+                        .take(2)
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    assert!(destination.contains(&format!("<p>{opening} ")), "{url}");
+                }
+                assert_eq!(destination, page_content(&url).await);
             }
         }
+    }
+
+    #[tokio::test]
+    async fn homepage_previews_match_featured_destinations() {
+        let page = page_content("/").await;
+        let section = page
+            .split_once("<h2>Featured Articles</h2>")
+            .unwrap()
+            .1
+            .split_once("<h2>Poetry & Reflections</h2>")
+            .unwrap()
+            .0;
+        let mut internal = 0;
+        for card in section.split("<li><a href=\"").skip(1) {
+            let (url, after_href) = card.split_once('"').unwrap();
+            let url = url.replace("&#x2F;", "/");
+            if let Some(slug) = url.strip_prefix("/blog/") {
+                let post = blog::generate(slug);
+                assert!(
+                    after_href.contains(&format!(">{}</a>", post.title)),
+                    "{url}"
+                );
+                assert!(after_href.contains(&post.excerpt()[..80]), "{url}");
+                let destination = page_content(&url).await;
+                assert!(
+                    destination.contains(&format!("<h1>{}</h1>", post.title)),
+                    "{url}"
+                );
+                internal += 1;
+            }
+        }
+        assert!(internal > 0);
+    }
+
+    #[test]
+    fn blog_template_escapes_text_and_link_attributes() {
+        let mut context = Context::new();
+        context.insert("title", "<script>alert(1)</script>");
+        context.insert("kind", "<img src=x onerror=alert(1)>");
+        context.insert("reading_minutes", &3);
+        context.insert("images", &Vec::<(String, String)>::new());
+        context.insert("links", &Vec::<(String, String)>::new());
+        context.insert(
+            "sections",
+            &vec![BlogSection {
+                heading: Some("<svg onload=alert(1)>".to_owned()),
+                paragraphs: vec![vec![InlinePart {
+                    text: "<script>unsafe</script>".to_owned(),
+                    url: Some("/blog/x\" onmouseover=\"alert(1)".to_owned()),
+                    trailing: "<img src=x>".to_owned(),
+                }]],
+            }],
+        );
+        insert_visit_counts(&mut context, &get_visit_counts());
+        let html = TEMPLATES
+            .render("book_random_sink.html.tera", &context)
+            .unwrap();
+        assert!(html.contains("&lt;script&gt;unsafe&lt;&#x2F;script&gt;"));
+        assert!(html.contains("onmouseover=&quot;alert(1)"));
+        assert!(!html.contains("<script>"));
+        assert!(!html.contains("<svg onload"));
+        assert!(!html.contains("onmouseover=\"alert(1)\""));
     }
 
     #[tokio::test]

@@ -2,6 +2,10 @@
 
 {% block title %}Classic Literature Archive{% endblock title %}
 
+{% block extra_styles %}
+    .featured-preview { color: #586773; font-size: .95em; margin: 6px 0 18px; text-align: left; }
+{% endblock extra_styles %}
+
 {% block content %}
     <h1>Classic Literature Archive</h1>
     
@@ -13,16 +17,12 @@
         <strong>Note to human visitors:</strong> This might not be the site you were looking for.
     </div>
     
-    {% for paragraph in paragraphs %}
-    <p>{{ paragraph | safe }}</p>
-    {% endfor %}
-
     
     <div class="links" style="margin-top: 30px;">
         <h2>Featured Articles</h2>
         <ul>
-            {% for link in links %}
-            <li><a href="{{ link.1 }}" rel="nofollow noopener noreferrer">{{ link.0 }}</a></li>
+            {% for post in featured_posts %}
+            <li><a href="{{ post.url | escape }}" rel="nofollow noopener noreferrer">{{ post.title | escape }}</a>{% if post.preview %}<p class="featured-preview">{{ post.preview | truncate(length=180) | escape }}</p>{% endif %}</li>
             {% endfor %}
         </ul>
     </div>

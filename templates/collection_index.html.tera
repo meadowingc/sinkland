@@ -1,6 +1,6 @@
 {% extends "base.html.tera" %}
 
-{% block title %}{{ heading }}{% endblock title %}
+{% block title %}{{ heading | escape }}{% endblock title %}
 
 {% block extra_styles %}
     .collection-grid {
@@ -31,6 +31,7 @@
         color: #555;
         margin: 0;
         overflow-wrap: anywhere;
+        text-align: left;
     }
 
     .collection-preview.haiku {
@@ -40,15 +41,15 @@
 {% endblock extra_styles %}
 
 {% block content %}
-    <h1>{{ heading }}</h1>
-    <p>{{ intro }}</p>
+    <h1>{{ heading | escape }}</h1>
+    <p>{{ intro | escape }}</p>
     <div class="collection-grid">
         {% for entry in entries %}
         <article class="collection-card">
-            <h2><a href="{{ entry.url }}" rel="nofollow noopener noreferrer">{{ entry.title }}</a></h2>
-            <p class="collection-preview{% if is_haiku %} haiku{% endif %}">{% if is_haiku %}{{ entry.excerpt }}{% else %}{{ entry.excerpt | truncate(length=180) }}{% endif %}</p>
+            <h2><a href="{{ entry.url | escape }}" rel="nofollow noopener noreferrer">{{ entry.title | escape }}</a></h2>
+            <p class="collection-preview{% if is_haiku %} haiku{% endif %}">{% if is_haiku %}{{ entry.excerpt | escape }}{% else %}{{ entry.excerpt | truncate(length=180) | escape }}{% endif %}</p>
         </article>
         {% endfor %}
     </div>
-    <p><a class="collection-refresh" href="{{ refresh_url }}" rel="nofollow noopener noreferrer">Explore another selection</a></p>
+    <p><a class="collection-refresh" href="{{ refresh_url | escape }}" rel="nofollow noopener noreferrer">Explore another selection</a></p>
 {% endblock content %}

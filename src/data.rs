@@ -1,6 +1,11 @@
 use once_cell::sync::Lazy;
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
+
+const BLOG_TEXTURE_WORDS: &[&str] = &[
+    "quiet", "familiar", "strange", "ordinary", "gentle", "still", "small", "distant", "patient",
+    "clear", "old", "new", "warm", "empty",
+];
 
 // Load .env file on first access
 static ENV_LOADED: Lazy<()> = Lazy::new(|| {
@@ -52,11 +57,13 @@ pub static HAIKU_DATA: Lazy<HaikuData> = Lazy::new(|| {
 pub struct BookData {
     pub titles: Vec<String>,
     pub sentences: Vec<String>,
+    pub blog_textures: Vec<&'static str>,
 }
 
 pub static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
     let mut titles = Vec::new();
     let mut sentences = Vec::new();
+    let mut blog_textures = BTreeSet::new();
 
     // Read all .txt files from the books directory
     let books_dir = "assets/books";
@@ -82,6 +89,18 @@ pub static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
                 continue;
             }
         };
+
+        if !file_path.ends_with("meadow__blog_posts.txt") {
+            for word in content.split_whitespace() {
+                let word = word.trim_matches(|character: char| !character.is_ascii_alphabetic());
+                if let Some(&candidate) = BLOG_TEXTURE_WORDS
+                    .iter()
+                    .find(|candidate| word.eq_ignore_ascii_case(candidate))
+                {
+                    blog_textures.insert(candidate);
+                }
+            }
+        }
 
         // Find the actual book content (after START marker, before END marker)
         let start_marker = "*** START OF";
@@ -166,7 +185,11 @@ pub static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
     let mut seen = HashSet::new();
     titles.retain(|title| seen.insert(title.clone()));
 
-    BookData { titles, sentences }
+    BookData {
+        titles,
+        sentences,
+        blog_textures: blog_textures.into_iter().collect(),
+    }
 });
 
 // Helper function to split text into sentences

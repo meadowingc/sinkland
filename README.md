@@ -3,7 +3,8 @@ Inspired by https://herman.bearblog.dev/messing-with-bots/
 # Sinkland
 
 A playground of different traps for AI bots and scrapers. Generates an endless
-maze of book excerpts, haikus, fictional social profiles, and procedural images.
+maze of procedural blog posts, book excerpts, haikus, fictional social profiles,
+and images.
 Pages are generated on demand, not stored in a database.
 
 Generated links stay inside Sinkland unless you configure friend traps through
@@ -13,7 +14,7 @@ Only add trap sites whose operators have agreed to receive crawler traffic.
 Sinkland does not mix unrelated real sites into its generated links.
 In blog paragraphs, inline links wrap short 2–4-word phrases with meaningful
 endpoints rather than isolated stopwords; they do not span sentence punctuation.
-Related-article links and friend-link probabilities are otherwise unchanged.
+Related-article links use the destination's generated title.
 The `/blog/blog-posts` and `/haiku/reflections` entrypoints show a fresh
 collection of links with previews on every visit. Linked blog and haiku pages
 repeat their generated content for the same URL; fictional
@@ -23,6 +24,14 @@ friends, and a fixed date range for their generated links. The homepage, social
 feed and search remain fresh on each visit, while footer visit counts remain live.
 Social post detail pages still generate fresh content independently of profile
 cards; their links do not identify a stored post.
+
+Blog posts use four seeded formats (reading notes, field diaries, personal
+essays, and observations). Each article follows one premise through varied
+sections and roughly 350–900 words of original procedural prose. Public-domain
+books supply only a small filtered vocabulary of individual words, not sentences
+or passages. Homepage and collection previews come from the linked article;
+the selection refreshes while each destination remains stable. The blog
+generator intentionally changes the content of older blog URLs.
 
 ## Local development
 
@@ -35,8 +44,9 @@ Visit `http://localhost:43796/`, `/blog/blog-posts`, `/haiku/reflections`,
 The default listener is `0.0.0.0:43796`; set `SINKLAND_BIND=127.0.0.1:43796` to
 listen only on loopback. This setting accepts an IP address and port, not a hostname.
 
-The first build downloads books from Project Gutenberg, a haiku dataset, and blog
-posts into `assets/`. Run the executable from a directory containing `assets/`,
+The first build downloads books from Project Gutenberg, a haiku dataset, and a
+legacy blog RSS feed into `assets/`. The feed does not contribute vocabulary to
+procedural blog posts. Run the executable from a directory containing `assets/`,
 `templates/`, and `static/`. An optional `.env` file can set `SINKLAND_FRIENDS` to a
 JSON array of URLs.
 

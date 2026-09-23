@@ -1,6 +1,6 @@
 {% extends "base.html.tera" %}
 
-{% block title %}{{ title }}{% endblock title %}
+{% block title %}{{ title | escape }}{% endblock title %}
 
 {% block extra_styles %}
     .haiku-box {
@@ -22,17 +22,17 @@
 {% endblock extra_styles %}
 
 {% block content %}
-    <h1>{{ title }}</h1>
+    <h1>{{ title | escape }}</h1>
     
     <div class="haiku-box">
-        <div class="haiku">{{ haiku }}</div>
+        <div class="haiku">{{ haiku | escape }}</div>
     </div>
     
     <div class="links">
         <h2>More Reflections</h2>
         <ul>
             {% for link in links %}
-            <li><a href="{{ link.1 }}" rel="nofollow noopener noreferrer" style="font-style: italic;">{{ link.0 }}</a></li>
+            <li><a href="{{ link.1 | escape }}" rel="nofollow noopener noreferrer" style="font-style: italic;">{{ link.0 | escape }}</a></li>
             {% endfor %}
         </ul>
     </div>

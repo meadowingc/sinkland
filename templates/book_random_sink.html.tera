@@ -1,25 +1,38 @@
 {% extends "base.html.tera" %}
 
-{% block title %}{{ title }}{% endblock title %}
+{% block title %}{{ title | escape }}{% endblock title %}
+
+{% block extra_styles %}
+    .blog-meta { color: #586773; font-size: .95em; margin: -12px 0 30px; }
+    .blog-section { max-width: 74ch; margin: 0 0 28px; }
+    .blog-section h2 { margin: 26px 0 12px; }
+    .blog-section p { line-height: 1.75; text-align: left; }
+{% endblock extra_styles %}
 
 {% block content %}
-    <h1>{{ title }}</h1>
+    <h1>{{ title | escape }}</h1>
+    <p class="blog-meta">{{ kind | escape }} · {{ reading_minutes }} min read</p>
     
     {% for image in images %}
     <figure style="margin: 20px 0; text-align: center;">
-        <img src="{{ image.0 }}" alt="{{ image.1 }}" style="max-width: 100%; height: auto; border-radius: 8px;">
+        <img src="{{ image.0 | escape }}" alt="{{ image.1 | escape }}" style="max-width: 100%; height: auto; border-radius: 8px;">
     </figure>
     {% endfor %}
 
-    {% for paragraph in paragraphs %}
-    <p>{{ paragraph | safe }}</p>
+    {% for section in sections %}
+    <section class="blog-section">
+    {% if section.heading %}<h2>{{ section.heading | escape }}</h2>{% endif %}
+    {% for paragraph in section.paragraphs %}
+    <p>{% for part in paragraph %}{% if not loop.first %} {% endif %}{% if part.url %}<a href="{{ part.url | escape }}" rel="nofollow noopener noreferrer">{{ part.text | escape }}</a>{{ part.trailing | escape }}{% else %}{{ part.text | escape }}{% endif %}{% endfor %}</p>
+    {% endfor %}
+    </section>
     {% endfor %}
     
     <div class="links">
         <h2>Related Articles</h2>
         <ul>
             {% for link in links %}
-            <li><a href="{{ link.1 }}" rel="nofollow noopener noreferrer">{{ link.0 }}</a></li>
+            <li><a href="{{ link.1 | escape }}" rel="nofollow noopener noreferrer">{{ link.0 | escape }}</a></li>
             {% endfor %}
         </ul>
     </div>
