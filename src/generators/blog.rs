@@ -1,6 +1,6 @@
 use crate::data::BOOK_DATA;
 use crate::generators::images::simple_hash;
-use crate::generators::tags::ThreadKey;
+use crate::generators::tags::{Tag, ThreadKey};
 use rand::{Rng, SeedableRng, seq::SliceRandom};
 use rand_chacha::ChaCha8Rng;
 use serde::Serialize;
@@ -966,6 +966,170 @@ pub fn title_for(identity: &str) -> String {
     post_identity(identity).2
 }
 
+fn matching_tags(theme: Theme) -> Vec<Tag> {
+    let words = theme
+        .topic
+        .split(|ch: char| !ch.is_ascii_alphabetic())
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<_>>();
+    let hints: [(Tag, &[&str]); 7] = [
+        (
+            Tag::Waiting,
+            &[
+                "wait",
+                "waiting",
+                "clock",
+                "routine",
+                "morning",
+                "evening",
+                "weekday",
+                "unscheduled",
+                "bus",
+                "ferry",
+                "lunch",
+            ],
+        ),
+        (
+            Tag::PublicInfrastructure,
+            &[
+                "tunnel",
+                "bridge",
+                "road",
+                "street",
+                "building",
+                "pier",
+                "station",
+                "canal",
+                "library",
+                "schoolyards",
+                "market",
+                "greenhouse",
+                "arcade",
+                "hall",
+                "playground",
+            ],
+        ),
+        (
+            Tag::Coordination,
+            &[
+                "shared",
+                "community",
+                "friend",
+                "hall",
+                "market",
+                "tables",
+                "kitchen",
+                "schoolyards",
+                "meeting",
+                "cafe",
+                "letter",
+                "chairs",
+                "rehearsal",
+            ],
+        ),
+        (
+            Tag::StreetSounds,
+            &[
+                "sound",
+                "sounds",
+                "listen",
+                "street",
+                "rehearsal",
+                "music",
+                "clock",
+                "bakery",
+                "cinema",
+            ],
+        ),
+        (
+            Tag::Ecology,
+            &[
+                "garden",
+                "gardener",
+                "orchard",
+                "field",
+                "rain",
+                "weather",
+                "coastal",
+                "harbor",
+                "allotments",
+                "greenhouse",
+                "plant",
+            ],
+        ),
+        (
+            Tag::Wayfinding,
+            &[
+                "atlas",
+                "index",
+                "guide",
+                "travel",
+                "journal",
+                "route",
+                "walk",
+                "walking",
+                "path",
+                "road",
+                "lane",
+                "station",
+                "street",
+                "ferry",
+                "footbridge",
+                "pier",
+                "crossroads",
+                "steps",
+            ],
+        ),
+        (
+            Tag::MissingRecords,
+            &[
+                "diary",
+                "notes",
+                "letter",
+                "photographs",
+                "records",
+                "missing",
+                "memoir",
+                "ledger",
+                "book",
+                "chapter",
+                "manual",
+                "journal",
+                "index",
+                "margin",
+                "translation",
+                "sign",
+                "number",
+            ],
+        ),
+    ];
+    hints
+        .into_iter()
+        .filter(|(_, cues)| {
+            words
+                .iter()
+                .any(|word| cues.iter().any(|cue| word.eq_ignore_ascii_case(cue)))
+        })
+        .map(|(tag, _)| tag)
+        .collect()
+}
+
+pub fn tags_for(identity: &str) -> Vec<Tag> {
+    if let Some(key) = ThreadKey::from_blog_slug(identity) {
+        return vec![key.tag];
+    }
+    let (_, theme, _, _) = post_identity(identity);
+    let mut candidates = matching_tags(theme);
+    if candidates.is_empty() {
+        candidates = Tag::ALL.to_vec();
+    }
+    let mut rng = stream(identity, "topics");
+    candidates.shuffle(&mut rng);
+    let count = rng.gen_range(1..=candidates.len().min(2));
+    candidates.truncate(count);
+    candidates
+}
+
 fn format_development<R: Rng>(format: usize, theme: Theme, rng: &mut R) -> String {
     let Theme {
         topic,
@@ -1639,6 +1803,38 @@ pub fn generate(identity: &str) -> Post {
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn blog_topics_are_repeatable_and_favor_premise_cues() {
+        let mut used_fallback = false;
+        for seed in 0..512_u64 {
+            let identity = format!("archive/{seed:016x}");
+            let tags = tags_for(&identity);
+            assert_eq!(tags, tags_for(&identity));
+            assert!((1..=2).contains(&tags.len()));
+            assert!(tags.iter().all(|tag| Tag::ALL.contains(tag)));
+            if tags.len() == 2 {
+                assert_ne!(tags[0], tags[1]);
+            }
+            let (_, theme, _, _) = post_identity(&identity);
+            let candidates = matching_tags(theme);
+            if candidates.is_empty() {
+                used_fallback = true;
+            } else {
+                assert!(
+                    tags.iter().all(|tag| candidates.contains(tag)),
+                    "{identity}"
+                );
+            }
+        }
+        assert!(used_fallback);
+        assert!(matching_tags(THEMES[1][1]).contains(&Tag::Ecology));
+        assert!(matching_tags(THEMES[3][2]).contains(&Tag::StreetSounds));
+        assert_eq!(
+            tags_for(&ThreadKey::new(Tag::Waiting, 42).blog_slug()),
+            vec![Tag::Waiting]
+        );
+    }
 
     #[test]
     fn posts_are_seeded_varied_and_original() {

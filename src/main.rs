@@ -1,6 +1,7 @@
 mod data;
 mod generators;
 mod papers;
+mod poetry;
 mod tags;
 
 use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA};
@@ -52,6 +53,7 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
 // as of 2025-12-18
 static BLOG_VISITS: AtomicUsize = AtomicUsize::new(1854446);
 static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(18137);
+static POETRY_VISITS: AtomicUsize = AtomicUsize::new(0);
 static SOCIAL_VISITS: AtomicUsize = AtomicUsize::new(1259);
 static PAPER_VISITS: AtomicUsize = AtomicUsize::new(0);
 
@@ -60,6 +62,7 @@ static PAPER_VISITS: AtomicUsize = AtomicUsize::new(0);
 struct VisitCounts {
     blog: usize,
     haiku: usize,
+    poetry: usize,
     social: usize,
     papers: usize,
     total: usize,
@@ -69,14 +72,16 @@ struct VisitCounts {
 fn increment_blog_visits() -> VisitCounts {
     let blog = BLOG_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
     let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
+    let poetry = POETRY_VISITS.load(Ordering::Relaxed);
     let social = SOCIAL_VISITS.load(Ordering::Relaxed);
     let papers = PAPER_VISITS.load(Ordering::Relaxed);
     VisitCounts {
         blog,
         haiku,
+        poetry,
         social,
         papers,
-        total: blog + haiku + social + papers,
+        total: blog + haiku + poetry + social + papers,
     }
 }
 
@@ -84,14 +89,16 @@ fn increment_blog_visits() -> VisitCounts {
 fn increment_haiku_visits() -> VisitCounts {
     let blog = BLOG_VISITS.load(Ordering::Relaxed);
     let haiku = HAIKU_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
+    let poetry = POETRY_VISITS.load(Ordering::Relaxed);
     let social = SOCIAL_VISITS.load(Ordering::Relaxed);
     let papers = PAPER_VISITS.load(Ordering::Relaxed);
     VisitCounts {
         blog,
         haiku,
+        poetry,
         social,
         papers,
-        total: blog + haiku + social + papers,
+        total: blog + haiku + poetry + social + papers,
     }
 }
 
@@ -99,14 +106,16 @@ fn increment_haiku_visits() -> VisitCounts {
 fn increment_social_visits() -> VisitCounts {
     let blog = BLOG_VISITS.load(Ordering::Relaxed);
     let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
+    let poetry = POETRY_VISITS.load(Ordering::Relaxed);
     let social = SOCIAL_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
     let papers = PAPER_VISITS.load(Ordering::Relaxed);
     VisitCounts {
         blog,
         haiku,
+        poetry,
         social,
         papers,
-        total: blog + haiku + social + papers,
+        total: blog + haiku + poetry + social + papers,
     }
 }
 
@@ -114,14 +123,16 @@ fn increment_social_visits() -> VisitCounts {
 fn get_visit_counts() -> VisitCounts {
     let blog = BLOG_VISITS.load(Ordering::Relaxed);
     let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
+    let poetry = POETRY_VISITS.load(Ordering::Relaxed);
     let social = SOCIAL_VISITS.load(Ordering::Relaxed);
     let papers = PAPER_VISITS.load(Ordering::Relaxed);
     VisitCounts {
         blog,
         haiku,
+        poetry,
         social,
         papers,
-        total: blog + haiku + social + papers,
+        total: blog + haiku + poetry + social + papers,
     }
 }
 
@@ -130,10 +141,16 @@ fn increment_paper_visits() -> VisitCounts {
     get_visit_counts()
 }
 
+fn increment_poetry_visits() -> VisitCounts {
+    POETRY_VISITS.fetch_add(1, Ordering::Relaxed);
+    get_visit_counts()
+}
+
 /// Helper to insert visit counts into template context
 fn insert_visit_counts(context: &mut Context, counts: &VisitCounts) {
     context.insert("blog_visits", &counts.blog);
     context.insert("haiku_visits", &counts.haiku);
+    context.insert("poetry_visits", &counts.poetry);
     context.insert("social_visits", &counts.social);
     context.insert("paper_visits", &counts.papers);
     context.insert("total_visits", &counts.total);
@@ -172,6 +189,12 @@ struct BlogLink {
     title: String,
     url: String,
     preview: String,
+}
+
+#[derive(Serialize)]
+struct BlogTopic {
+    slug: &'static str,
+    label: &'static str,
 }
 
 fn featured_posts(links: Vec<(String, String)>) -> Vec<BlogLink> {
@@ -588,6 +611,14 @@ fn scraper_trap(Path(slug): Path<String>) -> Result<Html<String>, poem::Error> {
     context.insert("sections", &sections);
     context.insert("images", &images);
     context.insert("links", &links);
+    let topics = blog::tags_for(&slug)
+        .into_iter()
+        .map(|tag| BlogTopic {
+            slug: tag.slug(),
+            label: tag.label(),
+        })
+        .collect::<Vec<_>>();
+    context.insert("topics", &topics);
     if let Some(key) = ThreadKey::from_blog_slug(&slug) {
         context.insert("tagged_thread", &key.links());
     }
@@ -612,10 +643,12 @@ fn index() -> Result<Html<String>, poem::Error> {
 
     let num_haiku_links = rng.gen_range(3..=5);
     let haiku_links = generate_haiku_links(num_haiku_links, epoch_limit, &mut rng);
+    let poetry_links = poetry::discover(3)?;
 
     let mut context = Context::new();
     context.insert("featured_posts", &featured_posts);
     context.insert("haiku_links", &haiku_links);
+    context.insert("poetry_links", &poetry_links);
 
     insert_visit_counts(&mut context, &visit_counts);
 
@@ -948,6 +981,8 @@ fn routes() -> Route {
         .at("/", get(index))
         .at("/haiku/reflections", get(haiku_index))
         .at("/haiku/*slug", get(haiku_page))
+        .at("/poetry", get(poetry::index))
+        .at("/poetry/:form/:id", get(poetry::detail))
         .at("/blog/blog-posts", get(blog_index))
         .at("/blog/*slug", get(scraper_trap))
         .at("/tags", get(tags::index))
@@ -967,6 +1002,7 @@ fn routes() -> Route {
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
+    generators::poetry::validate_lexicon().map_err(std::io::Error::other)?;
     let app = routes();
 
     let bind_address = match std::env::var("SINKLAND_BIND") {
@@ -1330,6 +1366,7 @@ mod tests {
         let mut context = Context::new();
         context.insert("featured_posts", &posts);
         context.insert("haiku_links", &Vec::<(String, String)>::new());
+        context.insert("poetry_links", &Vec::<poetry::PoetryLink>::new());
         insert_visit_counts(&mut context, &get_visit_counts());
         let page = TEMPLATES.render("index_trap.html.tera", &context).unwrap();
         let featured = page
@@ -1354,6 +1391,188 @@ mod tests {
         assert!(!page.contains("<script>friend</script>"));
         assert!(!page.contains("q=\"<script>\""));
         assert!(page.contains("<p class=\"featured-preview\">"));
+    }
+
+    #[tokio::test]
+    async fn poetry_collection_previews_match_repeatable_poems_and_haikus() {
+        let listing = page_content("/poetry").await;
+        assert_ne!(listing, page_content("/poetry").await);
+        let cards = listing
+            .split("<article class=\"poetry-card\">")
+            .skip(1)
+            .collect::<Vec<_>>();
+        assert_eq!(cards.len(), generators::poetry::Form::all().len() + 2);
+        let mut forms = std::collections::HashSet::new();
+        let mut haikus = 0;
+        for card in cards {
+            assert!(
+                card.split_once("</h2>")
+                    .unwrap()
+                    .1
+                    .split_once("<p class=\"poetry-preview")
+                    .unwrap()
+                    .0
+                    .trim()
+                    .is_empty()
+            );
+            let (url, remaining) = card
+                .split_once("<h2><a href=\"")
+                .unwrap()
+                .1
+                .split_once('"')
+                .unwrap();
+            let url = unescape_template_text(url);
+            let title = remaining
+                .split_once('>')
+                .unwrap()
+                .1
+                .split_once("</a>")
+                .unwrap()
+                .0;
+            let preview = card
+                .split_once("<p class=\"poetry-preview")
+                .unwrap()
+                .1
+                .split_once('>')
+                .unwrap()
+                .1
+                .split_once("</p>")
+                .unwrap()
+                .0;
+            let destination = page_content(&url).await;
+            assert!(destination.contains(&format!("<h1>{title}</h1>")));
+            if url.starts_with("/haiku/archive/") {
+                assert!(card.contains("class=\"poetry-preview haiku\""), "{url}");
+                assert!(
+                    destination.contains(&format!("<div class=\"haiku\">{preview}</div>")),
+                    "{url}"
+                );
+                haikus += 1;
+            } else {
+                let parts = url.split('/').collect::<Vec<_>>();
+                assert_eq!(parts.len(), 4);
+                assert_eq!(parts[1], "poetry");
+                assert_eq!(parts[3].len(), 16);
+                assert!(forms.insert(parts[2].to_owned()));
+                assert!(
+                    destination.contains(&format!("<span class=\"poem-line\">{preview}</span>")),
+                    "{url}"
+                );
+            }
+            assert_eq!(destination, page_content(&url).await);
+        }
+        assert_eq!(forms.len(), generators::poetry::Form::all().len());
+        assert_eq!(haikus, 2);
+    }
+
+    #[tokio::test]
+    async fn homepage_poetry_links_show_only_matching_titles_and_keep_haikus() {
+        let homepage = page_content("/").await;
+        let section = homepage
+            .split_once("<h2>Poetry & Reflections</h2>")
+            .unwrap()
+            .1
+            .split_once("<h2>Research Archive</h2>")
+            .unwrap()
+            .0;
+        assert!(section.contains("href=\"/poetry\""));
+        assert!(section.contains("/haiku/") || section.contains("&#x2F;haiku&#x2F;"));
+        assert!(!section.contains("featured-preview"));
+        let mut poems = 0;
+        for card in section.split("<li><a href=\"").skip(1) {
+            let (url, after_href) = card.split_once('"').unwrap();
+            let url = unescape_template_text(url);
+            if !url.starts_with("/poetry/") {
+                continue;
+            }
+            let title = after_href
+                .split_once('>')
+                .unwrap()
+                .1
+                .split_once("</a>")
+                .unwrap()
+                .0;
+            let item = card.split_once("</li>").unwrap().0;
+            assert!(item.ends_with("</a>"), "{url}");
+            let detail = page_content(&url).await;
+            assert!(detail.contains(&format!("<h1>{title}</h1>")), "{url}");
+            poems += 1;
+        }
+        assert_eq!(poems, 3);
+    }
+
+    #[tokio::test]
+    async fn related_poetry_links_show_only_titles() {
+        let detail = page_content("/poetry/couplet/000000000000002a").await;
+        let after_title = detail.split_once("</h1>").unwrap().1;
+        assert!(
+            after_title
+                .split_once("<div class=\"poem-box\">")
+                .unwrap()
+                .0
+                .trim()
+                .is_empty()
+        );
+        let related = detail
+            .split_once("<h2>More poems</h2>")
+            .unwrap()
+            .1
+            .split_once("</ul>")
+            .unwrap()
+            .0;
+        let items = related.split("<li>").skip(1).collect::<Vec<_>>();
+        assert_eq!(items.len(), 4);
+        for item in items {
+            assert!(item.starts_with("<a href=\""));
+            assert!(item.split_once("</li>").unwrap().0.ends_with("</a>"));
+        }
+    }
+
+    #[tokio::test]
+    async fn poetry_invalid_forms_and_seeds_are_not_found() {
+        use poem::Endpoint;
+        for path in [
+            "/poetry/unknown/000000000000002a",
+            "/poetry/couplet/xyz",
+            "/poetry/couplet/000000000000002A",
+            "/poetry/couplet/000000000000002a/extra",
+        ] {
+            let request = poem::Request::builder().uri(path.parse().unwrap()).finish();
+            let response = routes().get_response(request).await;
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
+        }
+        let haiku = page_content("/haiku/2026/09/21/first").await;
+        assert!(haiku.contains("class=\"haiku\""));
+    }
+
+    #[test]
+    fn poetry_templates_escape_generated_text() {
+        let mut context = Context::new();
+        context.insert(
+            "poem",
+            &serde_json::json!({
+                "title": "<script>title</script>",
+                "stanzas": [["<img src=x onerror=alert(1)>"]]
+            }),
+        );
+        context.insert(
+            "related",
+            &vec![poetry::PoetryLink {
+                url: "/poetry/couplet/000000000000002a?x=\"bad\"".to_owned(),
+                title: "<script>neighbor</script>".to_owned(),
+                form: "Couplet",
+                preview: String::new(),
+            }],
+        );
+        insert_visit_counts(&mut context, &get_visit_counts());
+        let page = TEMPLATES
+            .render("poetry/detail.html.tera", &context)
+            .unwrap();
+        assert!(page.contains("&lt;script&gt;title"));
+        assert!(page.contains("&lt;img src=x onerror=alert(1)&gt;"));
+        assert!(!page.contains("<script>"));
+        assert!(!page.contains("<img src=x"));
+        assert!(!page.contains("?x=\"bad\""));
     }
 
     #[tokio::test]
@@ -1407,6 +1626,13 @@ mod tests {
         context.insert("images", &Vec::<(String, String)>::new());
         context.insert("links", &Vec::<(String, String)>::new());
         context.insert(
+            "topics",
+            &vec![BlogTopic {
+                slug: "x\" onclick=\"alert(1)",
+                label: "<script>topic</script>",
+            }],
+        );
+        context.insert(
             "sections",
             &vec![BlogSection {
                 heading: Some("<svg onload=alert(1)>".to_owned()),
@@ -1426,6 +1652,8 @@ mod tests {
         assert!(!html.contains("<script>"));
         assert!(!html.contains("<svg onload"));
         assert!(!html.contains("onmouseover=\"alert(1)\""));
+        assert!(!html.contains("onclick=\"alert(1)\""));
+        assert!(html.contains("&lt;script&gt;topic"));
     }
 
     #[tokio::test]
@@ -1529,6 +1757,7 @@ mod tests {
                 .await;
             assert_eq!(response.status(), StatusCode::NOT_FOUND, "{id}");
         }
+
         for path in [
             "/social/user/tag_waiting?thread=01",
             "/social/user/tag_waiting?thread=nope",
@@ -1582,5 +1811,32 @@ mod tests {
         assert!(!html.contains("<svg onload=alert(1)>"));
         assert!(!html.contains("onclick=\"alert(1)\""));
         assert!(html.contains("&lt;script&gt;"));
+    }
+
+    #[tokio::test]
+    async fn blog_topics_link_through_feeds_to_all_topics_without_a_navbar_link() {
+        let slug = "archive/000000000000002a";
+        let page = page_content(&format!("/blog/{slug}")).await;
+        let topics = blog::tags_for(slug);
+        let nav = page
+            .split_once("<nav aria-label=\"Topics\">")
+            .unwrap()
+            .1
+            .split_once("</nav>")
+            .unwrap()
+            .0;
+        assert_eq!(nav.matches("href=\"/tags/").count(), topics.len());
+        for tag in topics {
+            assert!(nav.contains(&format!("href=\"/tags/{}\"", tag.slug())));
+            assert!(nav.contains(&format!("#{}", tag.label())));
+            let feed = page_content(&format!("/tags/{}", tag.slug())).await;
+            assert!(feed.contains("<a href=\"/tags\""));
+        }
+        assert!(page_content("/tags").await.contains("<h1>Topics</h1>"));
+        let tagged = page_content("/blog/tag-waiting-42").await;
+        assert!(tagged.contains("aria-label=\"Related thread\""));
+        assert!(!tagged.contains("aria-label=\"Topics\""));
+        let homepage = page_content("/").await;
+        assert!(!homepage.contains("<a href=\"/tags\""));
     }
 }

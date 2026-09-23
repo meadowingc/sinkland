@@ -1,0 +1,24 @@
+{% extends "base.html.tera" %}
+
+{% block title %}Poetry Archive{% endblock title %}
+
+{% block extra_styles %}
+    .poetry-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; margin: 24px 0; }
+    .poetry-card { padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; min-width: 0; }
+    .poetry-card h2 { margin: 0 0 8px; overflow-wrap: anywhere; }
+    .poetry-card p { margin: 8px 0; }
+    .poetry-preview.haiku { white-space: pre-line; font-style: italic; }
+{% endblock extra_styles %}
+
+{% block content %}
+    <h1>Poetry Archive</h1>
+    <div class="poetry-grid">
+        {% for entry in entries %}
+        <article class="poetry-card">
+            <h2><a href="{{ entry.url | escape }}" rel="nofollow noopener noreferrer">{{ entry.title | escape }}</a></h2>
+            <p class="poetry-preview{% if entry.form == "Haiku" %} haiku{% endif %}">{{ entry.preview | escape }}</p>
+        </article>
+        {% endfor %}
+    </div>
+    <p><a href="/poetry" rel="nofollow noopener noreferrer">More poems</a></p>
+{% endblock content %}

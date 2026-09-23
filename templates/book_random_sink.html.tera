@@ -18,6 +18,10 @@
         · <a href="{{ tagged_thread.paper_url | escape }}" rel="nofollow">{{ tagged_thread.paper_title | escape }}</a>
         · <a href="{{ tagged_thread.social_post_url | escape }}" rel="nofollow">Post by @{{ tagged_thread.social_username | escape }}</a>
     </nav>
+    {% else %}
+    <nav aria-label="Topics">
+        Topics: {% for topic in topics %}<a href="/tags/{{ topic.slug | escape }}" rel="nofollow noopener noreferrer">#{{ topic.label | escape }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+    </nav>
     {% endif %}
     
     {% for image in images %}

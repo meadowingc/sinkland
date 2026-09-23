@@ -2,8 +2,8 @@
 """Manual, offline content sampler. Run: python3 scripts/quality-sampler.py [--count 4].
 
 Requires a running local preview and a literal loopback IP in --base. No external
-URLs are requested, including redirects. At most 12 + 11 * count local requests
-(122 at the cap of 10); each has a 5-second timeout and 2 MB HTML limit.
+URLs are requested, including redirects. At most 13 + 14 * count local requests
+(153 at the cap of 10); each has a 5-second timeout and 2 MB HTML limit.
 Requires five Gutenberg texts in --books-dir (default: repo assets/books).
 Checks sampled pages, not the entire site; style findings are advisory only.
 """
@@ -24,7 +24,7 @@ import urllib.request
 MAX_COUNT = 10
 MAX_BYTES = 2_000_000
 MAX_BOOK_BYTES = 5_000_000
-MAX_BLOG_WORDS = 100_000
+MAX_SAMPLED_WORDS = 100_000
 TIMEOUT = 5
 BOOKS = (
     "christmas_carol.txt", "dracula.txt", "frankenstein.txt",
@@ -48,8 +48,8 @@ def blog_ngrams(bodies):
     for path, paragraph in bodies:
         words = [word.casefold() for word in WORDS.findall(paragraph)]
         total += len(words)
-        if total > MAX_BLOG_WORDS:
-            raise ValueError(f"sampled blog bodies exceed {MAX_BLOG_WORDS} words")
+        if total > MAX_SAMPLED_WORDS:
+            raise ValueError(f"sampled blog and poetry text exceed {MAX_SAMPLED_WORDS} words")
         for i in range(len(words) - 11):
             windows[tuple(words[i:i + 12])].add(path)
     return windows
@@ -327,7 +327,7 @@ class Sampler:
                 self.error(path, "paper card missing title/link/preview")
                 continue
             paper_path = anchor.attrs.get("href", "")
-            if not re.fullmatch(r"/papers/p/v2\.[A-Za-z0-9.]+", paper_path):
+            if not re.fullmatch(r"/papers/p/v2\.[A-Za-z0-9.-]+", paper_path):
                 self.error(path, f"noncanonical paper link: {paper_path!r}")
                 continue
             content = self.stable(paper_path, text(anchor))
@@ -345,8 +345,67 @@ class Sampler:
             references = first(content, "ol", "references")
             link = next((a for a in references.all("a")
                          if a.attrs.get("href", "").startswith("/papers/p/")), None) if references else None
-            self.probe_link(paper_path, link, r"/papers/p/v2\.[A-Za-z0-9.]+",
+            self.probe_link(paper_path, link, r"/papers/p/v2\.[A-Za-z0-9.-]+",
                             "missing internal paper reference link")
+
+    def sample_poetry(self, rng):
+        listing = self.inspect("/poetry", "Poetry Archive")
+        if listing is None:
+            return
+        cards = list(listing.all("article", "poetry-card"))
+        if len(cards) < min(self.count, 8):
+            self.error("/poetry", "missing poetry cards")
+        selected = rng.sample(cards, min(self.count, len(cards)))
+        for card in selected:
+            anchor = first(card, "a")
+            preview = first(card, "p", "poetry-preview")
+            if anchor is None or preview is None or not text(preview):
+                self.error("/poetry", "poetry card missing title/link/preview")
+                continue
+            path = anchor.attrs.get("href", "")
+            haiku = re.fullmatch(r"/haiku/archive/[0-9a-f]{16}", path) is not None
+            if not haiku and not re.fullmatch(
+                    r"/poetry/[a-z]+(?:-[a-z]+)*/[0-9a-f]{16}", path):
+                self.error("/poetry", f"malformed poetry link: {path!r}")
+                continue
+            content = self.stable(path, text(anchor))
+            if content is None:
+                continue
+            if haiku:
+                verse = first(content, "div", "haiku")
+                if verse is None or text(verse) != text(preview):
+                    self.error(path, "haiku preview differs from destination")
+                self.samples["poetry"].append(text(verse) if verse else "")
+                self.blog_bodies.append((path, text(verse) if verse else ""))
+                self.probe_link(
+                    path,
+                    next((a for a in content.all("a")
+                          if a.attrs.get("href", "").startswith("/haiku/")), None),
+                    r"/haiku/[A-Za-z0-9/_%-]+",
+                    "missing related haiku link",
+                )
+                continue
+            stanza = first(content, "p", "poem-stanza")
+            first_line = first(stanza, "span", "poem-line") if stanza else None
+            if first_line is None or text(first_line) != text(preview):
+                self.error(path, "poetry preview differs from first line")
+            stanzas = list(content.all("p", "poem-stanza"))
+            if not stanzas or any(not list(stanza.all("span", "poem-line")) for stanza in stanzas):
+                self.error(path, "poetry page has empty stanzas")
+            verses = [
+                " ".join(text(line) for line in stanza.all("span", "poem-line"))
+                for stanza in stanzas
+            ]
+            self.samples["poetry"].extend(verse for verse in verses if verse)
+            self.blog_bodies.extend((path, verse) for verse in verses if verse)
+            self.probe_link(
+                path,
+                next((a for a in content.all("a")
+                      if re.fullmatch(r"/poetry/[a-z]+(?:-[a-z]+)*/[0-9a-f]{16}",
+                                      a.attrs.get("href", ""))), None),
+                r"/poetry/[a-z]+(?:-[a-z]+)*/[0-9a-f]{16}",
+                "missing related poetry link",
+            )
 
     def sample_profiles(self, rng):
         for username in rng.sample(USERNAMES, self.count):
@@ -442,7 +501,7 @@ class Sampler:
         handle = "tag_" + slug.replace("-", "_")
         expected = (
             blog_match is not None and thread_seed < 2**64 and
-            re.fullmatch(r"/papers/p/v2\.[a-z0-9.]+", paper_path) is not None and
+            re.fullmatch(r"/papers/p/v2\.[a-z0-9.-]+", paper_path) is not None and
             paper_path.rsplit(".", 1)[-1] == f"{thread_seed:016x}" and
             profile_path == f"/social/user/{handle}?thread={thread_seed}" and
             post_path == f"/social/post/{handle}_{thread_seed:016x}" and
@@ -526,6 +585,7 @@ class Sampler:
     def run(self):
         rng = random.Random(self.seed)
         self.sample_blog(rng)
+        self.sample_poetry(rng)
         self.sample_papers()
         self.sample_profiles(rng)
         self.sample_tags(rng)
@@ -550,14 +610,14 @@ class Sampler:
             if common:
                 phrase, uses = max(common, key=lambda item: item[1])
                 warnings.append(f"{kind}: {len(common)} repeated eight-word phrases (most frequent {' '.join(phrase)!r}: {uses})")
-        print(f"Sampled {self.count} seeded blog URLs and one fresh index card, up to {self.count} papers and {self.count} profiles; {self.requests} local HTTP requests.")
+        print(f"Sampled {self.count} seeded blog URLs, up to {self.count} poems, papers, and profiles; {self.requests} local HTTP requests.")
         print(f"Tag sampling: {self.tag_responses}/8 index, seeded feed (twice), next page, and four cross-linked target responses received.")
-        print(f"Compared sampled blog body paragraphs with {checked_books}/{len(BOOKS)} required Gutenberg texts (exact normalized 12-word spans).")
+        print(f"Compared sampled blog and poetry text with {checked_books}/{len(BOOKS)} required Gutenberg texts (exact normalized 12-word spans).")
         for error in self.errors:
             print("ERROR:", error)
         for warning in warnings:
             print("ADVISORY:", warning)
-        print("Scope: book comparison covers sampled blog body paragraphs (including the first tagged blog), not RSS or unsampled pages; one seeded tag feed and first thread are inspected. Full internal-link coverage, fresh feeds, external links, image bodies, and semantic quote attribution are not verified.")
+        print("Scope: book comparison covers sampled blog body paragraphs and poetry stanzas (including the first tagged blog), not RSS or unsampled pages; one seeded tag feed and first thread are inspected. Full internal-link coverage, fresh feeds, external links, image bodies, and semantic quote attribution are not verified.")
         print(f"{len(self.errors)} objective errors; {len(warnings)} stylistic advisories.")
         return 1 if self.errors else 0
 

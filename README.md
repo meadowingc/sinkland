@@ -4,7 +4,7 @@ Inspired by https://herman.bearblog.dev/messing-with-bots/
 
 A playground of different traps for AI bots and scrapers. Generates an endless
 maze of procedural blog posts, book excerpts, haikus, fictional social profiles,
-and images.
+rhymed poems, and images.
 Pages are generated on demand, not stored in a database.
 
 Generated links stay inside Sinkland unless you configure friend traps through
@@ -42,6 +42,28 @@ per format, 16 title patterns per format, and multiple format-specific
 developments, reflections, and endings.
 This expansion intentionally changes the content of older blog URLs.
 
+## Rhymed poetry
+
+`/poetry` presents a fresh mix of haikus, couplets, quatrains (AABB, ABAB, or
+ABBA), ballad stanzas, monorhymes, limerick-like poems, chain-rhyme stanzas,
+triolets, and sonnet-like poems. A rhymed poem at `/poetry/<form>/<seed>` has the
+same title, lines, and rhyme pattern when revisited (the seed is 16 lowercase
+hex digits); collection and homepage selections change on refresh. The
+existing `/haiku/reflections` and `/haiku/*` URLs remain available with their
+original generation behavior, while haiku cards also appear in the mixed
+poetry collection. The homepage poetry list shows titles only.
+
+Line endings come from a checked-in, reviewed pronunciation-based rhyme bank,
+not from matching the last letters of words. The poetry engine fits phrases
+to each line's syllable target and reuses exact lines where a form requires a
+refrain. It does not promise traditional stress-based meter or a coherent
+story; hence the `-like` labels for limericks and sonnets. The data is included
+at build time, with no additional service or runtime download on the Pi. The
+poetry lexicon's pronunciation and syllable data were checked against the CMU
+Pronouncing Dictionary (revision `74790861f652b15e4ac49015a90074ad62a27690`);
+see `corpus/poetry/CMU-LICENSE.txt`. Release archives include that notice
+alongside the binary.
+
 Social profiles now draw from 18 topical personas, each with distinct bios, six
 written posts, and eight additional observations combined with several openings
 and persona-specific reactions. A profile avoids repeating even a differently
@@ -59,10 +81,14 @@ when visited without a seed; a `seed` of exactly 16 lowercase hex digits and a
 `/tags/waiting?seed=000000000000002a&page=0`). Continue to the next page for
 more generated threads. Each thread's blog post, canonical paper, and social
 post point to the same identities; tagged detail pages link back to a seeded
-topic feed containing that thread. The tag vocabulary is bounded for thematic
-accuracy, but the threads are generated on demand rather than stored or limited
-to a fixed set of stories. Untagged pages keep their usual fresh discovery and
-unrelated-link behavior.
+topic feed containing that thread. The tag vocabulary is bounded to keep thread
+mappings coherent, but the threads are generated on demand rather than stored
+or limited to a fixed set of stories. Rather than appearing in the main
+navigation, topic feeds are linked from blog posts; each topic feed links to
+the full `/tags` index. Ordinary posts select one or two stable topics from cues in their
+premise, falling back to a seeded selection when no cue matches. Tagged posts
+keep their matching thread topic. Ordinary pages otherwise retain their fresh
+discovery and unrelated-link behavior.
 
 ## Local development
 

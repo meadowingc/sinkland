@@ -1,0 +1,28 @@
+{% extends "base.html.tera" %}
+
+{% block title %}{{ poem.title | escape }}{% endblock title %}
+
+{% block extra_styles %}
+    .poem-box { background: #f8f9fa; padding: clamp(20px, 5vw, 40px); margin: 28px 0; border-left: 4px solid #3498db; border-radius: 4px; }
+    .poem-stanza { margin: 0 0 1.5em; font-size: 1.2em; line-height: 1.9; text-align: left; overflow-wrap: anywhere; }
+    .poem-stanza:last-child { margin-bottom: 0; }
+    .poem-line { display: block; }
+{% endblock extra_styles %}
+
+{% block content %}
+    <h1>{{ poem.title | escape }}</h1>
+    <div class="poem-box">
+        {% for stanza in poem.stanzas %}
+        <p class="poem-stanza">{% for line in stanza %}<span class="poem-line">{{ line | escape }}</span>{% endfor %}</p>
+        {% endfor %}
+    </div>
+    <p><a href="/poetry" rel="nofollow noopener noreferrer">Browse more poetry</a></p>
+    <div class="links">
+        <h2>More poems</h2>
+        <ul>
+            {% for entry in related %}
+            <li><a href="{{ entry.url | escape }}" rel="nofollow noopener noreferrer">{{ entry.title | escape }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock content %}

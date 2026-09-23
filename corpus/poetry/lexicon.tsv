@@ -1,0 +1,116 @@
+# poetry-lexicon-version: 1
+# Original, manually curated US English vocabulary.
+# Format: role|word|syllables|ARPABET pronunciation (end words only).
+# End words carry the stressed vowel and following sounds used as rhyme keys.
+# Syllables reflect the listed pronunciation; other roles use "-" in column four.
+# End pronunciations checked against Carnegie Mellon University's CMU
+# Pronouncing Dictionary, cmusphinx/cmudict revision
+# 74790861f652b15e4ac49015a90074ad62a27690; see CMU-LICENSE.txt.
+subject|clock|1|-
+subject|map|1|-
+subject|book|1|-
+subject|bus|1|-
+subject|moth|1|-
+subject|wind|1|-
+subject|bridge|1|-
+subject|leaf|1|-
+subject|lantern|2|-
+subject|river|2|-
+subject|window|2|-
+subject|sparrow|2|-
+subject|garden|2|-
+subject|shadow|2|-
+subject|heron|2|-
+subject|compass|2|-
+subject|tunnel|2|-
+subject|neighbor|2|-
+subject|butterfly|3|-
+subject|cicada|3|-
+verb|holds|1|-
+verb|finds|1|-
+verb|keeps|1|-
+verb|seeks|1|-
+verb|hides|1|-
+verb|hears|1|-
+verb|marks|1|-
+verb|crosses|2|-
+verb|follows|2|-
+verb|gathers|2|-
+verb|carries|2|-
+verb|borrows|2|-
+verb|unfolds|2|-
+verb|forgets|2|-
+verb|remembers|3|-
+verb|discovers|3|-
+verb|imagines|3|-
+modifier|small|1|-
+modifier|blue|1|-
+modifier|old|1|-
+modifier|late|1|-
+modifier|warm|1|-
+modifier|quiet|2|-
+modifier|silver|2|-
+modifier|lonely|2|-
+modifier|faded|2|-
+modifier|gentle|2|-
+modifier|paper|2|-
+end|light|1|L AY1 T
+end|night|1|N AY1 T
+end|sight|1|S AY1 T
+end|flight|1|F L AY1 T
+end|kite|1|K AY1 T
+end|rain|1|R EY1 N
+end|train|1|T R EY1 N
+end|lane|1|L EY1 N
+end|grain|1|G R EY1 N
+end|chain|1|CH EY1 N
+end|stone|1|S T OW1 N
+end|bone|1|B OW1 N
+end|phone|1|F OW1 N
+end|cone|1|K OW1 N
+end|throne|1|TH R OW1 N
+end|dream|1|D R IY1 M
+end|stream|1|S T R IY1 M
+end|beam|1|B IY1 M
+end|seam|1|S IY1 M
+end|theme|1|TH IY1 M
+end|door|1|D AO1 R
+end|shore|1|SH AO1 R
+end|floor|1|F L AO1 R
+end|store|1|S T AO1 R
+end|oar|1|AO1 R
+end|bell|1|B EH1 L
+end|shell|1|SH EH1 L
+end|well|1|W EH1 L
+end|cell|1|S EH1 L
+end|spell|1|S P EH1 L
+end|park|1|P AA1 R K
+end|mark|1|M AA1 R K
+end|spark|1|S P AA1 R K
+end|bark|1|B AA1 R K
+end|shark|1|SH AA1 R K
+end|moon|1|M UW1 N
+end|spoon|1|S P UW1 N
+end|tune|1|T UW1 N
+end|noon|1|N UW1 N
+end|dune|1|D UW1 N
+end|lake|1|L EY1 K
+end|cake|1|K EY1 K
+end|rake|1|R EY1 K
+end|snake|1|S N EY1 K
+end|flake|1|F L EY1 K
+end|ring|1|R IH1 NG
+end|thing|1|TH IH1 NG
+end|wing|1|W IH1 NG
+end|string|1|S T R IH1 NG
+end|king|1|K IH1 NG
+end|sound|1|S AW1 N D
+end|ground|1|G R AW1 N D
+end|mound|1|M AW1 N D
+end|pound|1|P AW1 N D
+end|hound|1|HH AW1 N D
+end|sheep|1|SH IY1 P
+end|heap|1|HH IY1 P
+end|jeep|1|JH IY1 P
+end|peep|1|P IY1 P
+end|sleep|1|S L IY1 P

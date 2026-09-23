@@ -103,6 +103,63 @@ class QualitySamplerTests(unittest.TestCase):
         self.assertIn("preview differs", " ".join(run.errors))
         self.assertEqual(len(opener.calls), 5)
 
+    def test_poetry_sample_checks_stable_previews_and_related_links(self):
+        poem_path = "/poetry/couplet/000000000000002a"
+        neighbor = "/poetry/quatrain/0000000000000001"
+        listing = page(
+            '<h1>Poetry Archive</h1><article class="poetry-card">'
+            f'<a href="{poem_path}">A lantern</a>'
+            '<p class="poetry-preview">A lantern at the gate</p></article>',
+            "Poetry Archive",
+        )
+        poem = page(
+            '<h1>A lantern</h1><p class="poem-stanza">'
+            '<span class="poem-line">A lantern at the gate</span>'
+            '<span class="poem-line">A shadow waiting late</span></p>'
+            f'<a href="{neighbor}">Another poem</a>',
+            "A lantern",
+        )
+        run, opener = self.make_sampler({
+            "/poetry": listing,
+            poem_path: poem,
+            neighbor: page("<h1>Another poem</h1>", "Another poem"),
+        })
+        run.sample_poetry(random.Random(42))
+        self.assertEqual(run.errors, [])
+        self.assertEqual(len(opener.calls), 4)
+        self.assertEqual(len(run.samples["poetry"]), 1)
+
+        changed = listing.replace("A lantern at the gate", "Unrelated preview")
+        run, _ = self.make_sampler({
+            "/poetry": changed, poem_path: poem, neighbor: page("<h1>Another poem</h1>")
+        })
+        run.sample_poetry(random.Random(42))
+        self.assertIn("preview differs", " ".join(run.errors))
+
+    def test_poetry_sample_accepts_haiku_cards_with_matching_destinations(self):
+        path = "/haiku/archive/000000000000002a"
+        neighbor = "/haiku/2025/01/02/a-silent-moment"
+        verse = "A small lantern glows\nBeneath the paper window\nThe far river rests"
+        listing = page(
+            '<h1>Poetry Archive</h1><article class="poetry-card">'
+            f'<a href="{path}">A quiet title</a>'
+            f'<p class="poetry-preview haiku">{verse}</p></article>',
+            "Poetry Archive",
+        )
+        poem = page(
+            f'<h1>A quiet title</h1><div class="haiku">{verse}</div>'
+            f'<a href="{neighbor}">Another haiku</a>',
+            "A quiet title",
+        )
+        run, opener = self.make_sampler({
+            "/poetry": listing, path: poem,
+            neighbor: page("<h1>Another haiku</h1>", "Another haiku"),
+        })
+        run.sample_poetry(random.Random(42))
+        self.assertEqual(run.errors, [])
+        self.assertEqual(len(opener.calls), 4)
+        self.assertEqual(len(run.samples["poetry"]), 1)
+
     def test_sampled_blog_requires_related_links_but_allows_external_only(self):
         seeded = "/blog/archive/1c80317fa3b1799d"
         listed = "/blog/archive/0123456789abcdef"
@@ -181,6 +238,7 @@ class QualitySamplerTests(unittest.TestCase):
         self.assertIn("unsafe <script>", " ".join(run.errors))
         run.samples["blog"] = ["These are the same twelve words in an identical paragraph here today."] * 2
         run.sample_blog = lambda rng: None
+        run.sample_poetry = lambda rng: None
         run.sample_papers = lambda: None
         run.sample_profiles = lambda rng: None
         run.sample_tags = lambda rng: None
@@ -212,11 +270,11 @@ class QualitySamplerTests(unittest.TestCase):
         self.assertEqual(run.errors, [])
         self.assertEqual(len(opener.calls), 2)
 
-    def tag_pages(self):
+    def tag_pages(self, paper_category="econ"):
         prefix = "/tags/waiting"
         seed = "000000000000002a"
         blog = "/blog/tag-waiting-42"
-        paper = "/papers/p/v2.econ.12345678.0.000000000000002a"
+        paper = f"/papers/p/v2.{paper_category}.12345678.0.000000000000002a"
         profile = "/social/user/tag_waiting?thread=42"
         post = "/social/post/tag_waiting_000000000000002a"
         tag_url = prefix + "?seed=" + seed
@@ -272,6 +330,11 @@ class QualitySamplerTests(unittest.TestCase):
         self.assertEqual(run.blog_bodies, [("/blog/tag-waiting-42",
                                            "First paragraph preview continues.")])
         self.assertTrue(all(url.startswith("http://127.0.0.1:12345/") for url in opener.calls))
+
+    def test_tags_sample_accepts_hyphenated_paper_category(self):
+        run, _ = self.make_sampler(self.tag_pages(paper_category="q-bio"))
+        run.sample_tags(random.Random(42))
+        self.assertEqual(run.errors, [])
 
     def test_tags_sample_reports_feed_drift_crosslink_and_preview_errors(self):
         pages = self.tag_pages()
@@ -338,6 +401,7 @@ class QualitySamplerTests(unittest.TestCase):
             self.assertIn("dracula.txt", run.errors[0])
             self.assertIn("verbatim span of at least 12", run.errors[0])
             run.sample_blog = lambda rng: None
+            run.sample_poetry = lambda rng: None
             run.sample_papers = lambda: None
             run.sample_profiles = lambda rng: None
             run.sample_tags = lambda rng: None
@@ -384,6 +448,7 @@ class QualitySamplerTests(unittest.TestCase):
             self.assertIn("missing or out-of-order", run.errors[0])
             self.assertIn(sampler.BOOKS[-1], run.errors[-1])
             run.sample_blog = lambda rng: None
+            run.sample_poetry = lambda rng: None
             run.sample_papers = lambda: None
             run.sample_profiles = lambda rng: None
             run.sample_tags = lambda rng: None

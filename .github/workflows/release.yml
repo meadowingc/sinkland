@@ -57,6 +57,7 @@ jobs:
         run: |
           mkdir -p package/assets dist
           install -m 755 target/aarch64-unknown-linux-musl/release/sinkland package/sinkland
+          install -m 644 corpus/poetry/CMU-LICENSE.txt package/CMU-LICENSE.txt
           cp -R assets/books assets/haikus.json package/assets/
           cp -R templates static package/
           test ! -e package/assets/papers
@@ -96,7 +97,7 @@ jobs:
             cat ../smoke.log
             exit 1
           fi
-          for path in blog/check haiku/check social social/user/check social/post/check social/media/check.png social/avatar/check.png social/banner/check.png static/hi.txt; do
+          for path in blog/check haiku/check poetry poetry/couplet/000000000000002a poetry/triolet/000000000000002a poetry/sonnet-like/000000000000002a social social/user/check social/post/check social/media/check.png social/avatar/check.png social/banner/check.png static/hi.txt; do
             curl --fail --silent --show-error "http://127.0.0.1:43796/$path" > /dev/null
           done
           python3 ../scripts/smoke-papers.py
