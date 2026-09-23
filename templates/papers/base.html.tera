@@ -67,7 +67,7 @@ figcaption { color: #586773; margin: 8px 0; }
 </nav>
 <form class="research-search" action="/papers/search" method="get" role="search">
     <input type="search" name="q" aria-label="Inspiration for generated discoveries" placeholder="Try quantum fluctuations or Bayesian inference" maxlength="200" value="{{ query | default(value='') | escape }}">
-    <button type="submit">Generate discoveries</button>
+    <button type="submit">Search</button>
 </form>
 {% block research_content %}{% endblock research_content %}
 {% endblock content %}

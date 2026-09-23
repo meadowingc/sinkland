@@ -11,7 +11,7 @@
 </article>
 {% endfor %}
 <nav class="pagination" aria-label="Discovery pages">
-    {% if has_previous %}<a href="?q={{ query | urlencode | escape }}&amp;seed={{ seed | escape }}&amp;page={{ previous_page }}" rel="nofollow">Previous discoveries</a>{% endif %}
-    {% if has_next %}<a href="?q={{ query | urlencode | escape }}&amp;seed={{ seed | escape }}&amp;page={{ next_page }}" rel="nofollow">More discoveries</a>{% endif %}
+    {% if has_previous %}<a href="?q={{ query | urlencode | escape }}&amp;seed={{ seed | escape }}&amp;page={{ previous_page }}" rel="nofollow">Previous page</a>{% endif %}
+    {% if has_next %}<a href="?q={{ query | urlencode | escape }}&amp;seed={{ seed | escape }}&amp;page={{ next_page }}" rel="nofollow">Next page</a>{% endif %}
 </nav>
 {% endblock research_content %}

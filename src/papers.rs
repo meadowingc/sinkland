@@ -98,7 +98,7 @@ fn discovery(
     } else if query.q.is_empty() {
         generator::ARCHIVE_NAME.to_owned()
     } else {
-        format!("Generated discoveries for “{}”", query.q)
+        format!("Results for “{}”", query.q)
     };
     let mut context = Context::new();
     context.insert("title", &title);
