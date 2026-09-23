@@ -1,6 +1,7 @@
 mod data;
 mod generators;
 mod papers;
+mod tags;
 
 use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA};
 use generators::blog;
@@ -11,24 +12,25 @@ use generators::social::{
     generate_comments_random, generate_feed_random, generate_post_random,
     generate_suggested_users_random, generate_trending_topics, generate_user_likes_random,
     generate_user_media_posts_random, generate_user_posts_random, generate_user_random,
-    generate_user_replies_random,
+    generate_user_replies_random, tagged_post, tagged_user,
 };
+use generators::tags::{Tag, ThreadKey};
 
 use image::ImageFormat;
 use once_cell::sync::Lazy;
 use poem::{
     Response, Route, Server,
     endpoint::StaticFilesEndpoint,
-    error::InternalServerError,
+    error::{BadRequest, InternalServerError},
     get, handler,
     http::StatusCode,
     listener::TcpListener,
-    web::{Html, Path},
+    web::{Html, Path, Query},
 };
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tera::{Context, Tera};
@@ -169,7 +171,21 @@ struct BlogSection {
 struct BlogLink {
     title: String,
     url: String,
-    preview: Option<String>,
+    preview: String,
+}
+
+fn featured_posts(links: Vec<(String, String)>) -> Vec<BlogLink> {
+    links
+        .into_iter()
+        .map(|(title, url)| {
+            let identity = url.strip_prefix("/blog/").unwrap_or(&url);
+            BlogLink {
+                preview: blog::generate(identity).excerpt().to_owned(),
+                title,
+                url,
+            }
+        })
+        .collect()
 }
 
 fn add_inline_links_to_paragraphs_with_rng<R: Rng>(
@@ -504,7 +520,7 @@ fn blog_index() -> Result<Html<String>, poem::Error> {
         .collect::<Vec<_>>();
     let mut context = Context::new();
     context.insert("heading", "Blog");
-    context.insert("intro", "Explore a selection of random blog posts.");
+    context.insert("intro", "Explore a selection of random blog posts from the archive.");
     context.insert("entries", &entries);
     context.insert("refresh_url", "/blog/blog-posts");
     context.insert("is_haiku", &false);
@@ -517,6 +533,12 @@ fn blog_index() -> Result<Html<String>, poem::Error> {
 
 #[handler]
 fn scraper_trap(Path(slug): Path<String>) -> Result<Html<String>, poem::Error> {
+    if slug.starts_with("tag-") && ThreadKey::from_blog_slug(&slug).is_none() {
+        return Err(poem::error::NotFound(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Unknown tagged blog post",
+        )));
+    }
     let visit_counts = increment_blog_visits();
 
     let blog::Post {
@@ -566,6 +588,9 @@ fn scraper_trap(Path(slug): Path<String>) -> Result<Html<String>, poem::Error> {
     context.insert("sections", &sections);
     context.insert("images", &images);
     context.insert("links", &links);
+    if let Some(key) = ThreadKey::from_blog_slug(&slug) {
+        context.insert("tagged_thread", &key.links());
+    }
     insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
@@ -583,16 +608,7 @@ fn index() -> Result<Html<String>, poem::Error> {
 
     let num_links = rng.gen_range(5..=10);
     let links = generate_random_links(num_links, &FRIENDS_LIST, epoch_limit, &mut rng);
-    let featured_posts = links
-        .into_iter()
-        .map(|(title, url)| BlogLink {
-            preview: url
-                .strip_prefix("/blog/")
-                .map(|slug| blog::generate(slug).excerpt().to_owned()),
-            title,
-            url,
-        })
-        .collect::<Vec<_>>();
+    let featured_posts = featured_posts(links);
 
     let num_haiku_links = rng.gen_range(3..=5);
     let haiku_links = generate_haiku_links(num_haiku_links, epoch_limit, &mut rng);
@@ -681,17 +697,52 @@ fn social_feed() -> Result<Html<String>, poem::Error> {
         .map(Html)
 }
 
+#[derive(Default, Deserialize)]
+struct SocialProfileQuery {
+    thread: Option<String>,
+}
+
+fn selected_profile_thread(
+    username: &str,
+    query: &SocialProfileQuery,
+) -> Result<Option<ThreadKey>, poem::Error> {
+    match (Tag::from_social_username(username), query.thread.as_deref()) {
+        (Some(tag), Some(seed)) => ThreadKey::from_parts(tag.slug(), seed)
+            .map(Some)
+            .map_err(|error| BadRequest(std::io::Error::other(error))),
+        (Some(tag), None) => Ok(Some(ThreadKey::new(tag, 0))),
+        (None, Some(_)) => Err(BadRequest(std::io::Error::other(
+            "Thread selection requires a tagged profile",
+        ))),
+        (None, None) => Ok(None),
+    }
+}
+
 #[handler]
-fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poem::Error> {
+fn social_user_profile(
+    Path(username): Path<String>,
+    Query(query): Query<SocialProfileQuery>,
+) -> Result<Html<String>, poem::Error> {
+    let thread = selected_profile_thread(&username, &query)?;
     let visit_counts = increment_social_visits();
 
-    let user = generate_user_random(&mut page_rng("social-user", &username), &username);
-    let posts = generate_user_posts_random(&mut page_rng("social-posts", &username), &user, 10);
+    let user = match Tag::from_social_username(&username) {
+        Some(tag) => tagged_user(tag),
+        None => generate_user_random(&mut page_rng("social-user", &username), &username),
+    };
+    let mut posts = generate_user_posts_random(&mut page_rng("social-posts", &username), &user, 10);
 
     let mut context = Context::new();
     context.insert("user", &user);
-    context.insert("posts", &posts);
     context.insert("active_tab", "posts");
+    if let Some(key) = thread {
+        posts.insert(0, tagged_post(key));
+        posts.truncate(10);
+        context.insert("tagged_thread", &key.links());
+        context.insert("tagged_post_id", &key.social_post_id());
+        context.insert("thread_query", &format!("?thread={}", key.seed));
+    }
+    context.insert("posts", &posts);
     insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
@@ -703,10 +754,15 @@ fn social_user_profile(Path(username): Path<String>) -> Result<Html<String>, poe
 #[handler]
 fn social_user_subpage(
     Path((username, subpage)): Path<(String, String)>,
+    Query(query): Query<SocialProfileQuery>,
 ) -> Result<Html<String>, poem::Error> {
+    let thread = selected_profile_thread(&username, &query)?;
     let visit_counts = increment_social_visits();
 
-    let user = generate_user_random(&mut page_rng("social-user", &username), &username);
+    let user = match Tag::from_social_username(&username) {
+        Some(tag) => tagged_user(tag),
+        None => generate_user_random(&mut page_rng("social-user", &username), &username),
+    };
     let mut rng = page_rng(
         match subpage.as_str() {
             "replies" => "social-replies",
@@ -719,6 +775,13 @@ fn social_user_subpage(
 
     let mut context = Context::new();
     context.insert("user", &user);
+    if let Some(key) = thread {
+        context.insert("tagged_thread", &key.links());
+        context.insert("thread_query", &format!("?thread={}", key.seed));
+        if !matches!(subpage.as_str(), "replies" | "media" | "likes") {
+            context.insert("tagged_post_id", &key.social_post_id());
+        }
+    }
     insert_visit_counts(&mut context, &visit_counts);
 
     // Generate content based on the subpage/tab
@@ -741,7 +804,11 @@ fn social_user_subpage(
         }
         _ => {
             // For followers, following, or any other subpage, show regular posts
-            let posts = generate_user_posts_random(&mut rng, &user, 10);
+            let mut posts = generate_user_posts_random(&mut rng, &user, 10);
+            if let Some(key) = thread {
+                posts.insert(0, tagged_post(key));
+                posts.truncate(10);
+            }
             context.insert("posts", &posts);
             context.insert("active_tab", "posts");
         }
@@ -754,20 +821,30 @@ fn social_user_subpage(
 }
 
 #[handler]
-fn social_post_page(Path(_post_id): Path<String>) -> Result<Html<String>, poem::Error> {
+fn social_post_page(Path(post_id): Path<String>) -> Result<Html<String>, poem::Error> {
     let visit_counts = increment_social_visits();
 
-    // Generate fresh random content on every page visit
-    let mut rng = rand::thread_rng();
-    let post = generate_post_random(&mut rng);
-    let num_comments = rng.gen_range(0..=8);
-    let comments = generate_comments_random(&mut rng, num_comments);
-    let related_posts = generate_feed_random(&mut rng, 5);
-
     let mut context = Context::new();
-    context.insert("post", &post);
-    context.insert("comments", &comments);
-    context.insert("related_posts", &related_posts);
+    if post_id.starts_with("tag_") {
+        let key = ThreadKey::from_social_post_id(&post_id)
+            .ok_or_else(|| poem::error::NotFound(std::io::Error::other("Unknown tagged post")))?;
+        let post = tagged_post(key);
+        context.insert("post", &post);
+        context.insert("comments", &Vec::<generators::social::Comment>::new());
+        context.insert("related_posts", &Vec::<generators::social::Post>::new());
+        context.insert("tagged_thread", &key.links());
+    } else {
+        // Ordinary post IDs intentionally retain fresh content on each visit.
+        let mut rng = rand::thread_rng();
+        let post = generate_post_random(&mut rng);
+        let num_comments = rng.gen_range(0..=8);
+        context.insert("post", &post);
+        context.insert(
+            "comments",
+            &generate_comments_random(&mut rng, num_comments),
+        );
+        context.insert("related_posts", &generate_feed_random(&mut rng, 5));
+    }
     insert_visit_counts(&mut context, &visit_counts);
 
     TEMPLATES
@@ -873,6 +950,8 @@ fn routes() -> Route {
         .at("/haiku/*slug", get(haiku_page))
         .at("/blog/blog-posts", get(blog_index))
         .at("/blog/*slug", get(scraper_trap))
+        .at("/tags", get(tags::index))
+        .at("/tags/:tag", get(tags::feed))
         .at("/robots.txt", get(robots_txt))
         .nest("/papers", papers::routes())
         // Social media routes
@@ -1223,6 +1302,60 @@ mod tests {
         assert!(internal > 0);
     }
 
+    #[test]
+    fn homepage_friend_links_have_procedural_previews() {
+        let friends = vec!["https://neighbor.example/trap/".to_owned()];
+        let mut rng = StdRng::seed_from_u64(42);
+        let links = generate_random_links(64, &friends, SEEDED_LINK_EPOCH_LIMIT, &mut rng);
+        let posts = featured_posts(links);
+        let mut internal = 0;
+        let mut external = 0;
+        let mut friend_previews = std::collections::HashSet::new();
+        for post in &posts {
+            assert!(!post.preview.is_empty());
+            if let Some(slug) = post.url.strip_prefix("/blog/") {
+                assert_eq!(post.title, blog::generate(slug).title);
+                assert_eq!(post.preview, blog::generate(slug).excerpt());
+                internal += 1;
+            } else {
+                assert!(post.url.starts_with("https://neighbor.example/trap/"));
+                assert_eq!(post.preview, blog::generate(&post.url).excerpt());
+                friend_previews.insert(&post.preview);
+                external += 1;
+            }
+        }
+        assert!(internal > 0 && external > 0);
+        assert!(friend_previews.len() > 1);
+
+        let mut context = Context::new();
+        context.insert("featured_posts", &posts);
+        context.insert("haiku_links", &Vec::<(String, String)>::new());
+        insert_visit_counts(&mut context, &get_visit_counts());
+        let page = TEMPLATES.render("index_trap.html.tera", &context).unwrap();
+        let featured = page
+            .split_once("<h2>Featured Articles</h2>")
+            .unwrap()
+            .1
+            .split_once("<h2>Poetry & Reflections</h2>")
+            .unwrap()
+            .0;
+        assert_eq!(
+            featured.matches("<p class=\"featured-preview\">").count(),
+            posts.len()
+        );
+
+        let injected = featured_posts(vec![(
+            "A <script>friend</script>".to_owned(),
+            "https://neighbor.example/trap/?q=\"<script>\"".to_owned(),
+        )]);
+        context.insert("featured_posts", &injected);
+        let page = TEMPLATES.render("index_trap.html.tera", &context).unwrap();
+        assert!(page.contains("A &lt;script&gt;friend&lt;&#x2F;script&gt;"));
+        assert!(!page.contains("<script>friend</script>"));
+        assert!(!page.contains("q=\"<script>\""));
+        assert!(page.contains("<p class=\"featured-preview\">"));
+    }
+
     #[tokio::test]
     async fn book_prose_modes_render_original_content() {
         let mut full_post = false;
@@ -1318,5 +1451,136 @@ mod tests {
             let _ = page_content("/social").await;
             assert_eq!(original, page_content(&path).await);
         }
+    }
+
+    #[tokio::test]
+    async fn tagged_threads_crosslink_exact_titles_and_keep_social_posts_stable() {
+        for tag in Tag::ALL {
+            let key = ThreadKey::new(tag, 0);
+            let links = key.links();
+            let blog_page = unescape_template_text(&page_content(&links.blog_url).await);
+            assert!(blog_page.contains(&format!("<h1>{}</h1>", links.blog_title)));
+            assert!(blog_page.contains(&links.paper_url));
+            assert!(blog_page.contains(&links.social_post_url));
+            assert!(blog_page.contains(&links.tag_url));
+            let profile = unescape_template_text(&page_content(&links.social_profile_url).await);
+            assert!(profile.contains(&links.social_post_url));
+            assert!(profile.contains(&links.social_name));
+            assert!(profile.contains(&links.blog_title));
+            assert!(profile.contains(&links.paper_title));
+            assert!(profile.contains(tag.social_observation()));
+            assert_eq!(
+                page_content(&links.social_profile_url).await,
+                page_content(&format!("{}/posts", links.social_profile_url)).await
+            );
+            let post = page_content(&links.social_post_url).await;
+            assert_eq!(post, page_content(&links.social_post_url).await);
+            let post = unescape_template_text(&post);
+            assert!(post.contains(&links.social_name));
+            assert!(post.contains(tag.social_observation()));
+            assert!(post.contains(tag.paper_topic()));
+            assert!(post.contains(&links.blog_url));
+            assert!(post.contains(&links.paper_url));
+            assert!(post.contains(&links.tag_url));
+        }
+
+        let key = ThreadKey::new(Tag::StreetSounds, 42);
+        let post = unescape_template_text(&page_content(&key.links().social_post_url).await);
+        assert!(post.contains(&key.links().blog_url));
+        assert!(!post.contains(&ThreadKey::new(Tag::StreetSounds, 0).links().blog_url));
+        let selected_profile = unescape_template_text(&page_content(&key.links().social_url).await);
+        assert!(selected_profile.contains(&key.links().blog_url));
+        assert!(selected_profile.contains(&key.links().paper_url));
+        assert!(selected_profile.contains(&key.links().social_post_url));
+        assert!(
+            !selected_profile
+                .contains(&ThreadKey::new(Tag::StreetSounds, 0).links().social_post_url)
+        );
+        let posts_url = format!("{}/posts?thread=42", key.links().social_profile_url);
+        assert_eq!(
+            page_content(&key.links().social_url).await,
+            page_content(&posts_url).await
+        );
+        assert!(selected_profile.contains(&format!(
+            "{}/replies?thread=42",
+            key.links().social_profile_url
+        )));
+        assert_ne!(
+            page_content("/social/post/abc123").await,
+            page_content("/social/post/abc123").await
+        );
+    }
+
+    #[tokio::test]
+    async fn malformed_tag_posts_return_404_and_tagged_markup_is_escaped() {
+        use poem::{Endpoint, Request, http::Uri};
+
+        for id in [
+            "tag_waiting_000000000000000",
+            "tag_waiting_000000000000000G",
+            "tag_unknown_0000000000000000",
+        ] {
+            let response = routes()
+                .get_response(
+                    Request::builder()
+                        .uri(format!("/social/post/{id}").parse::<Uri>().unwrap())
+                        .finish(),
+                )
+                .await;
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{id}");
+        }
+        for path in [
+            "/social/user/tag_waiting?thread=01",
+            "/social/user/tag_waiting?thread=nope",
+            "/social/user/riverstone?thread=42",
+        ] {
+            let response = routes()
+                .get_response(
+                    Request::builder()
+                        .uri(path.parse::<Uri>().unwrap())
+                        .finish(),
+                )
+                .await;
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{path}");
+        }
+
+        let key = ThreadKey::new(Tag::Waiting, 0);
+        let mut links = key.links();
+        links.blog_url = "/blog/x\" onclick=\"alert(1)".to_owned();
+        let mut user = generate_user_random(
+            &mut page_rng("social-user", &key.social_username()),
+            &key.social_username(),
+        );
+        user.display_name = "<svg onload=alert(1)>".to_owned();
+        let mut post = tagged_post(key);
+        post.author.display_name = user.display_name.clone();
+        post.content = "<script>alert(1)</script>".to_owned();
+        let mut context = Context::new();
+        context.insert("post", &post);
+        context.insert("comments", &Vec::<generators::social::Comment>::new());
+        context.insert("related_posts", &Vec::<generators::social::Post>::new());
+        context.insert("tagged_thread", &links);
+        insert_visit_counts(&mut context, &get_visit_counts());
+        let html = TEMPLATES.render("social/post.html.tera", &context).unwrap();
+        assert!(!html.contains("<script>alert(1)</script>"));
+        assert!(!html.contains("<svg onload=alert(1)>"));
+        assert!(!html.contains("onclick=\"alert(1)\""));
+        assert!(html.contains("&lt;script&gt;"));
+        assert!(html.contains("onclick=&quot;alert(1)"));
+
+        let mut context = Context::new();
+        context.insert("user", &user);
+        context.insert("posts", &vec![post]);
+        context.insert("active_tab", "posts");
+        context.insert("tagged_thread", &links);
+        context.insert("tagged_post_id", &key.social_post_id());
+        insert_visit_counts(&mut context, &get_visit_counts());
+        let html = TEMPLATES
+            .render("social/profile.html.tera", &context)
+            .unwrap();
+        assert!(!html.contains("<script>alert(1)</script>"));
+        assert!(!html.contains("<svg onload=alert(1)>"));
+        assert!(!html.contains("onclick=\"alert(1)\""));
+        assert!(html.contains("&lt;script&gt;"));
     }
 }

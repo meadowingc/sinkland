@@ -12,6 +12,13 @@
 {% block content %}
     <h1>{{ title | escape }}</h1>
     <p class="blog-meta">{{ kind | escape }} · {{ reading_minutes }} min read</p>
+    {% if tagged_thread %}
+    <nav aria-label="Related thread">
+        <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow">#{{ tagged_thread.tag_label | escape }}</a>
+        · <a href="{{ tagged_thread.paper_url | escape }}" rel="nofollow">{{ tagged_thread.paper_title | escape }}</a>
+        · <a href="{{ tagged_thread.social_post_url | escape }}" rel="nofollow">Post by @{{ tagged_thread.social_username | escape }}</a>
+    </nav>
+    {% endif %}
     
     {% for image in images %}
     <figure style="margin: 20px 0; text-align: center;">

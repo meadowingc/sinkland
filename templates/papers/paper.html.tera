@@ -12,6 +12,13 @@
         </ul>
         <div class="paper-meta">Archive ID: {{ paper.metadata.id | escape }}</div>
     </header>
+    {% if tagged_thread %}
+    <nav aria-label="Related thread">
+        <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow">#{{ tagged_thread.tag_label | escape }}</a>
+        · <a href="{{ tagged_thread.blog_url | escape }}" rel="nofollow">{{ tagged_thread.blog_title | escape }}</a>
+        · <a href="{{ tagged_thread.social_post_url | escape }}" rel="nofollow">Post by @{{ tagged_thread.social_username | escape }}</a>
+    </nav>
+    {% endif %}
     <details class="paper-citation">
         <summary>Cite this paper</summary>
         <p>{{ archive_name | escape }}.</p>

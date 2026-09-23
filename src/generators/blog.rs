@@ -1,5 +1,6 @@
 use crate::data::BOOK_DATA;
 use crate::generators::images::simple_hash;
+use crate::generators::tags::ThreadKey;
 use rand::{Rng, SeedableRng, seq::SliceRandom};
 use rand_chacha::ChaCha8Rng;
 use serde::Serialize;
@@ -937,6 +938,18 @@ fn book_prose_post(identity: &str, format: usize, theme: Theme, title: String) -
 }
 
 fn post_identity(identity: &str) -> (usize, Theme, String, &'static str) {
+    if let Some(key) = ThreadKey::from_blog_slug(identity) {
+        let format = key.tag.blog_format();
+        let theme = THEMES[format][key.tag.blog_theme()];
+        let mut identity_rng = stream(identity, "identity");
+        let title = title(theme, format, &mut identity_rng);
+        assert!(
+            BOOK_DATA.blog_textures.len() >= 5,
+            "Book corpus is missing blog vocabulary"
+        );
+        let texture = BOOK_DATA.blog_textures.choose(&mut identity_rng).unwrap();
+        return (format, theme, title, texture);
+    }
     let mut identity_rng = stream(identity, "identity");
     let format = identity_rng.gen_range(0..THEMES.len());
     let theme = *THEMES[format].choose(&mut identity_rng).unwrap();

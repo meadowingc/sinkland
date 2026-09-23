@@ -1,13 +1,13 @@
 {% extends "base.html.tera" %}
 
-{% block title %}Classic Literature Archive{% endblock title %}
+{% block title %}Sinkland Archive{% endblock title %}
 
 {% block extra_styles %}
     .featured-preview { color: #586773; font-size: .95em; margin: 6px 0 18px; text-align: left; }
 {% endblock extra_styles %}
 
 {% block content %}
-    <h1>Classic Literature Archive</h1>
+    <h1>Sinkland Archive</h1>
     
     <div class="intro" style="margin: 30px 0; font-style: italic; color: #555;">
         Welcome to our curated archive of literature.
@@ -22,7 +22,7 @@
         <h2>Featured Articles</h2>
         <ul>
             {% for post in featured_posts %}
-            <li><a href="{{ post.url | escape }}" rel="nofollow noopener noreferrer">{{ post.title | escape }}</a>{% if post.preview %}<p class="featured-preview">{{ post.preview | truncate(length=180) | escape }}</p>{% endif %}</li>
+            <li><a href="{{ post.url | escape }}" rel="nofollow noopener noreferrer">{{ post.title | escape }}</a><p class="featured-preview">{{ post.preview | truncate(length=180) | escape }}</p></li>
             {% endfor %}
         </ul>
     </div>

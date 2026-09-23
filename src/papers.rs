@@ -1,6 +1,7 @@
 use crate::{
     TEMPLATES,
     generators::papers::{self as generator, CATEGORIES, PaperId},
+    generators::tags::ThreadKey,
     increment_paper_visits, insert_visit_counts,
 };
 use poem::{
@@ -167,12 +168,16 @@ fn author(
 #[handler]
 async fn paper(Path(paper_id): Path<String>) -> Result<Html<String>, poem::Error> {
     let id: PaperId = paper_id.parse().map_err(not_found)?;
+    let thread = ThreadKey::from_paper_id(&id);
     let paper = tokio::task::spawn_blocking(move || generator::generate(&id))
         .await
         .map_err(server_error)?;
     let mut context = Context::new();
     context.insert("citation", &generator::citation(&paper.metadata));
     context.insert("paper", &paper);
+    if let Some(key) = thread {
+        context.insert("tagged_thread", &key.links());
+    }
     render("papers/paper.html.tera", context)
 }
 
@@ -359,5 +364,47 @@ mod tests {
             expected.bibtex
         );
         assert_eq!(get_visit_counts().papers, before);
+    }
+
+    #[tokio::test]
+    async fn only_exact_tagged_paper_ids_show_their_thread_links() {
+        use crate::generators::tags::{Tag, ThreadKey};
+
+        let key = ThreadKey::new(Tag::MissingRecords, 42);
+        let links = key.links();
+        let app = routes();
+        let body = app
+            .get_response(
+                Request::builder()
+                    .uri(format!("/p/{}", key.paper_id()).parse::<Uri>().unwrap())
+                    .finish(),
+            )
+            .await
+            .into_body()
+            .into_string()
+            .await
+            .unwrap()
+            .replace("&#x2F;", "/");
+        assert!(body.contains(&links.blog_url));
+        assert!(body.contains(&links.blog_title));
+        assert!(body.contains(&links.social_post_url));
+        assert!(body.contains(&links.tag_url));
+
+        let mut unrelated = key.paper_id();
+        unrelated.author = unrelated.author.wrapping_add(1);
+        assert!(ThreadKey::from_paper_id(&unrelated).is_none());
+        let body = app
+            .get_response(
+                Request::builder()
+                    .uri(format!("/p/{unrelated}").parse::<Uri>().unwrap())
+                    .finish(),
+            )
+            .await
+            .into_body()
+            .into_string()
+            .await
+            .unwrap();
+        assert!(!body.contains("aria-label=\"Related thread\""));
+        assert!(!body.contains(&links.social_post_url));
     }
 }

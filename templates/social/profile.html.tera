@@ -1,6 +1,6 @@
 {% extends "base.html.tera" %}
 
-{% block title %}{{ user.display_name }} (@{{ user.username }}) | SinkNet{% endblock title %}
+{% block title %}{{ user.display_name | escape }} (@{{ user.username | escape }}) | SinkNet{% endblock title %}
 
 {% block extra_styles %}
 .profile-container {
@@ -294,37 +294,42 @@
     <a href="/social" class="back-link" rel="nofollow noopener noreferrer">← Back to feed</a>
     
     <div class="profile-header">
-        <img src="/social/banner/{{ user.username }}.png" alt="Profile banner for {{ user.display_name }}" class="profile-banner">
+        <img src="/social/banner/{{ user.username | escape }}.png" alt="Profile banner for {{ user.display_name | escape }}" class="profile-banner">
     </div>
     
     <div class="profile-info">
-        <img src="/social/avatar/{{ user.username }}.png" alt="Avatar for {{ user.display_name }}" class="profile-avatar">
+        <img src="/social/avatar/{{ user.username | escape }}.png" alt="Avatar for {{ user.display_name | escape }}" class="profile-avatar">
         
         <div class="profile-actions">
             <button class="follow-btn">Follow</button>
         </div>
         
         <div class="profile-name">
-            <h1>{{ user.display_name }}</h1>
+            <h1>{{ user.display_name | escape }}</h1>
             {% if user.verified %}<span class="verified-badge">✓</span>{% endif %}
         </div>
         
-        <div class="profile-username">@{{ user.username }}</div>
+        <div class="profile-username">@{{ user.username | escape }}</div>
         
-        <div class="profile-bio">{{ user.bio }}</div>
+        <div class="profile-bio">{{ user.bio | escape }}</div>
+        {% if tagged_thread %}
+        <nav aria-label="Related topic">
+            <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow">#{{ tagged_thread.tag_label | escape }}</a>
+        </nav>
+        {% endif %}
         
         <div class="profile-meta">
-            <span>📅 Joined {{ user.join_date }}</span>
+            <span>📅 Joined {{ user.join_date | escape }}</span>
         </div>
         
         <div class="profile-stats">
             <span class="stat">
-                <a href="/social/user/{{ user.username }}/following" rel="nofollow noopener noreferrer">
+                <a href="/social/user/{{ user.username | escape }}/following{{ thread_query | default(value="") | escape }}" rel="nofollow noopener noreferrer">
                     <strong>{{ user.following }}</strong> Following
                 </a>
             </span>
             <span class="stat">
-                <a href="/social/user/{{ user.username }}/followers" rel="nofollow noopener noreferrer">
+                <a href="/social/user/{{ user.username | escape }}/followers{{ thread_query | default(value="") | escape }}" rel="nofollow noopener noreferrer">
                     <strong>{{ user.followers }}</strong> Followers
                 </a>
             </span>
@@ -332,23 +337,23 @@
     </div>
     
     <div class="profile-tabs">
-        <a href="/social/user/{{ user.username }}" class="tab {% if active_tab == "posts" or not active_tab %}active{% endif %}" rel="nofollow noopener noreferrer">Posts</a>
-        <a href="/social/user/{{ user.username }}/replies" class="tab {% if active_tab == "replies" %}active{% endif %}" rel="nofollow noopener noreferrer">Replies</a>
-        <a href="/social/user/{{ user.username }}/media" class="tab {% if active_tab == "media" %}active{% endif %}" rel="nofollow noopener noreferrer">Media</a>
-        <a href="/social/user/{{ user.username }}/likes" class="tab {% if active_tab == "likes" %}active{% endif %}" rel="nofollow noopener noreferrer">Likes</a>
+        <a href="/social/user/{{ user.username | escape }}{{ thread_query | default(value="") | escape }}" class="tab {% if active_tab == "posts" or not active_tab %}active{% endif %}" rel="nofollow noopener noreferrer">Posts</a>
+        <a href="/social/user/{{ user.username | escape }}/replies{{ thread_query | default(value="") | escape }}" class="tab {% if active_tab == "replies" %}active{% endif %}" rel="nofollow noopener noreferrer">Replies</a>
+        <a href="/social/user/{{ user.username | escape }}/media{{ thread_query | default(value="") | escape }}" class="tab {% if active_tab == "media" %}active{% endif %}" rel="nofollow noopener noreferrer">Media</a>
+        <a href="/social/user/{{ user.username | escape }}/likes{{ thread_query | default(value="") | escape }}" class="tab {% if active_tab == "likes" %}active{% endif %}" rel="nofollow noopener noreferrer">Likes</a>
     </div>
     
     {% if active_tab == "replies" %}
     <div class="tab-description" style="color: #657786; font-size: 0.9em; margin-bottom: 15px;">
-        Replies by @{{ user.username }} to other users
+        Replies by @{{ user.username | escape }} to other users
     </div>
     {% elif active_tab == "likes" %}
     <div class="tab-description" style="color: #657786; font-size: 0.9em; margin-bottom: 15px;">
-        Posts liked by @{{ user.username }}
+        Posts liked by @{{ user.username | escape }}
     </div>
     {% elif active_tab == "media" %}
     <div class="tab-description" style="color: #657786; font-size: 0.9em; margin-bottom: 15px;">
-        Media posts by @{{ user.username }}
+        Media posts by @{{ user.username | escape }}
     </div>
     {% endif %}
     
@@ -356,33 +361,39 @@
     <article class="post-card">
         {% if active_tab == "replies" and reply_targets[loop.index0] %}
         <div class="reply-context" style="color: #657786; font-size: 0.85em; margin-bottom: 10px; padding-left: 60px;">
-            Replying to <a href="/social/user/{{ reply_targets[loop.index0].username }}" style="color: #1da1f2;" rel="nofollow noopener noreferrer">@{{ reply_targets[loop.index0].username }}</a>
+            Replying to <a href="/social/user/{{ reply_targets[loop.index0].username | escape }}" style="color: #1da1f2;" rel="nofollow noopener noreferrer">@{{ reply_targets[loop.index0].username | escape }}</a>
         </div>
         {% endif %}
         
         <div class="post-header">
-            <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">
-                <img src="/social/avatar/{{ post.author.username }}.png" alt="Avatar for {{ post.author.display_name }}" class="avatar">
+            <a href="/social/user/{{ post.author.username | escape }}" rel="nofollow noopener noreferrer">
+                <img src="/social/avatar/{{ post.author.username | escape }}.png" alt="Avatar for {{ post.author.display_name | escape }}" class="avatar">
             </a>
             <div class="user-info">
-                <a href="/social/user/{{ post.author.username }}" class="display-name" rel="nofollow noopener noreferrer">
-                    {{ post.author.display_name }}
+                <a href="/social/user/{{ post.author.username | escape }}" class="display-name" rel="nofollow noopener noreferrer">
+                    {{ post.author.display_name | escape }}
                     {% if post.author.verified %}<span class="verified-badge" style="color: #1da1f2;">✓</span>{% endif %}
                 </a>
                 <div class="username">
-                    <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">@{{ post.author.username }}</a>
-                    · <span class="post-time">{{ post.relative_time }}</span>
+                    <a href="/social/user/{{ post.author.username | escape }}" rel="nofollow noopener noreferrer">@{{ post.author.username | escape }}</a>
+                    · <span class="post-time">{{ post.relative_time | escape }}</span>
                 </div>
             </div>
         </div>
         
         <div class="post-content">
+            {% if tagged_post_id and post.id == tagged_post_id %}
+            {{ post.content | escape }}
+            <p><a href="{{ tagged_thread.blog_url | escape }}" rel="nofollow">{{ tagged_thread.blog_title | escape }}</a> · <a href="{{ tagged_thread.paper_url | escape }}" rel="nofollow">{{ tagged_thread.paper_title | escape }}</a> · <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow">#{{ tagged_thread.tag_label | escape }}</a></p>
+            <a href="{{ tagged_thread.social_post_url | escape }}" rel="nofollow">View this post</a>
+            {% else %}
             {{ post.content | safe }}
+            {% endif %}
         </div>
         
         {% if post.has_image %}
-        <a href="/social/post/{{ post.id }}" rel="nofollow noopener noreferrer">
-            <img src="/social/media/{{ post.image_id }}.png" alt="{{ post.image_alt | default(value='Post image') }}" class="post-image">
+        <a href="/social/post/{{ post.id | escape }}" rel="nofollow noopener noreferrer">
+            <img src="/social/media/{{ post.image_id | escape }}.png" alt="{{ post.image_alt | default(value='Post image') | escape }}" class="post-image">
         </a>
         {% endif %}
         

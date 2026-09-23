@@ -24,6 +24,8 @@ friends, and a fixed date range for their generated links. The homepage, social
 feed and search remain fresh on each visit, while footer visit counts remain live.
 Social post detail pages still generate fresh content independently of profile
 cards; their links do not identify a stored post.
+Posts linked from the shared topic trails are an exception: those tagged post
+URLs keep their content and author on repeat visits.
 
 Blog posts use four seeded formats (reading notes, field diaries, personal
 essays, and observations). Each article follows one premise through varied
@@ -32,11 +34,12 @@ public-domain books supply a filtered vocabulary of individual words, not
 sentences or quotations. Some articles include an extra paragraph composed
 from that vocabulary and their existing premise; a smaller share are entirely
 composed in this book-influenced style. The legacy RSS feed is not used for
-blog prose. Homepage and collection previews come from the linked article;
-the selection refreshes while each destination remains
-stable. The blog generator draws from 18 curated premises per format, 16 title
-patterns per format, and multiple format-specific developments, reflections,
-and endings.
+blog prose. Internal homepage and collection previews come from the linked
+article; homepage friend links instead show invented procedural previews, not
+summaries of the external sites. The selection refreshes while each internal
+destination remains stable. The blog generator draws from 18 curated premises
+per format, 16 title patterns per format, and multiple format-specific
+developments, reflections, and endings.
 This expansion intentionally changes the content of older blog URLs.
 
 Social profiles now draw from 18 topical personas, each with distinct bios, six
@@ -46,6 +49,20 @@ worded version of the same observation within its ten-post window. Shared
 everyday posts and conversational replies add variety; paper mentions have 30
 post shapes. A profile's persona and posts remain repeatable for its username,
 while the feed remains fresh on each visit.
+
+## Shared topic trails
+
+`/tags` browses seven shared topics across compatible blog premises, fictional
+social personas, and synthetic paper subjects. A topic feed creates new threads
+when visited without a seed; a `seed` of exactly 16 lowercase hex digits and a
+`page` from 0 to 10000 revisit the same selection (for example,
+`/tags/waiting?seed=000000000000002a&page=0`). Continue to the next page for
+more generated threads. Each thread's blog post, canonical paper, and social
+post point to the same identities; tagged detail pages link back to a seeded
+topic feed containing that thread. The tag vocabulary is bounded for thematic
+accuracy, but the threads are generated on demand rather than stored or limited
+to a fixed set of stories. Untagged pages keep their usual fresh discovery and
+unrelated-link behavior.
 
 ## Local development
 
@@ -63,6 +80,18 @@ legacy blog RSS feed into `assets/`. The feed does not contribute vocabulary or
 passages to procedural blog posts. Run the executable from a directory
 containing `assets/`, `templates/`, and `static/`. An optional `.env` file can set
 `SINKLAND_FRIENDS` to a JSON array of URLs.
+
+To review generated pages locally without adding a CI gate:
+
+```bash
+python3 scripts/quality-sampler.py --count 10 --seed 42
+```
+
+The manual sampler only contacts a loopback preview, reads the five local
+Gutenberg assets, and checks a bounded selection of blog, paper, social, and
+topic pages. Objective mismatches exit nonzero; repetition metrics are advisory
+for human review. `--base` selects a different loopback address and `--books-dir`
+selects the local book assets. It does not claim to audit every generated page.
 
 ## Synthetic academic papers
 

@@ -1,0 +1,31 @@
+{% extends "base.html.tera" %}
+
+{% block title %}{{ tag_label | escape }} — Sinkland Topics{% endblock title %}
+
+{% block extra_styles %}
+.topic-thread { padding: 20px 0; border-bottom: 1px solid #ddd; }
+.topic-thread h2 { margin: 0 0 12px; }
+.topic-thread p { margin: 8px 0; text-align: left; }
+.topic-trail { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 24px; }
+{% endblock extra_styles %}
+
+{% block content %}
+<h1>{{ tag_label | escape }}</h1>
+<p><a href="/tags" rel="nofollow noopener noreferrer">All topics</a> ·
+   <a href="/tags/{{ tag_slug | escape }}" rel="nofollow noopener noreferrer">Next page</a></p>
+{% for thread in threads %}
+<article class="topic-thread">
+    <h2><a href="{{ thread.blog_url | escape }}" rel="nofollow noopener noreferrer">{{ thread.blog_title | escape }}</a></h2>
+    <p>{{ thread.blog_preview | truncate(length=180) | escape }}</p>
+    <p>Research: <a href="{{ thread.paper_url | escape }}" rel="nofollow noopener noreferrer">{{ thread.paper_title | escape }}</a></p>
+    <p>{{ thread.paper_preview | truncate(length=180) | escape }}</p>
+    <p>Conversation: <a href="{{ thread.social_url | escape }}" rel="nofollow noopener noreferrer">{{ thread.social_name | escape }}</a>
+       · <a href="{{ thread.post_url | escape }}" rel="nofollow noopener noreferrer">Read the post</a></p>
+    <p>{{ thread.post_preview | escape }}</p>
+</article>
+{% endfor %}
+<nav class="topic-trail" aria-label="More threads">
+    {% if has_previous %}<a href="?seed={{ seed | escape }}&amp;page={{ previous_page }}" rel="nofollow noopener noreferrer">Previous threads</a>{% endif %}
+    {% if has_next %}<a href="?seed={{ seed | escape }}&amp;page={{ next_page }}" rel="nofollow noopener noreferrer">Continue this trail</a>{% endif %}
+</nav>
+{% endblock content %}

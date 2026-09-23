@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
     <meta name="referrer" content="no-referrer">
-    <title>{% block title %}Classic Literature Archive{% endblock title %}</title>
+    <title>{% block title %}Sinkland Archive{% endblock title %}</title>
     <style>
         * {
             margin: 0;
@@ -179,12 +179,13 @@
 <body>
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="/" class="navbar-brand" rel="nofollow noopener noreferrer">Literature Archive</a>
+            <a href="/" class="navbar-brand" rel="nofollow noopener noreferrer">Sinkland Archive</a>
             <ul class="navbar-links">
                 <li><a href="/blog/blog-posts" rel="nofollow noopener noreferrer">Blog</a></li>
                 <li><a href="/haiku/reflections" rel="nofollow noopener noreferrer">Haiku</a></li>
                 <li><a href="/social" rel="nofollow noopener noreferrer">Social</a></li>
                 <li><a href="/papers" rel="nofollow noopener noreferrer">Papers</a></li>
+                <li><a href="/tags" rel="nofollow noopener noreferrer">Topics</a></li>
             </ul>
         </div>
     </nav>

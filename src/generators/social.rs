@@ -1,5 +1,9 @@
 use crate::data::{NAME_DATA, SHORT_PHRASES};
-use crate::generators::{images::simple_hash, papers};
+use crate::generators::{
+    images::simple_hash,
+    papers,
+    tags::{Tag, ThreadKey},
+};
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -654,8 +658,67 @@ const EVERYDAY_POSTS: &[&str] = &[
 ];
 
 fn social_persona(username: &str) -> &'static SocialPersona {
+    if let Some(tag) = Tag::from_social_username(username) {
+        return &SOCIAL_PERSONAS[tag.social_persona_index()];
+    }
     &SOCIAL_PERSONAS[(simple_hash(&format!("sinkland-social-persona-v1:{username}")) as usize)
         % SOCIAL_PERSONAS.len()]
+}
+
+#[cfg(test)]
+mod tagged_persona_tests {
+    use super::*;
+
+    #[test]
+    fn tag_handles_select_their_intended_personas() {
+        let examples = [
+            (Tag::Waiting, "Bus maps, side streets"),
+            (Tag::PublicInfrastructure, "Local history through old maps"),
+            (Tag::Coordination, "Helping organize the block"),
+            (Tag::StreetSounds, "Recording the sounds between songs"),
+            (Tag::Ecology, "Balcony gardener"),
+            (Tag::Wayfinding, "Bus maps, side streets"),
+            (Tag::MissingRecords, "Local history through old maps"),
+        ];
+        for (tag, bio) in examples {
+            assert!(
+                social_persona(&tag.social_username())
+                    .bios
+                    .iter()
+                    .any(|entry| entry.starts_with(bio)),
+                "{} mapped to the wrong persona",
+                tag
+            );
+        }
+        let ordinary = "ordinary_user";
+        let expected =
+            &SOCIAL_PERSONAS[(simple_hash(&format!("sinkland-social-persona-v1:{ordinary}"))
+                as usize)
+                % SOCIAL_PERSONAS.len()];
+        assert!(std::ptr::eq(social_persona(ordinary), expected));
+    }
+
+    #[test]
+    fn tagged_helpers_share_exact_profile_identity_and_repeat() {
+        for tag in Tag::ALL {
+            let user = tagged_user(tag);
+            let mut old_rng = ChaCha8Rng::seed_from_u64(simple_hash(&format!(
+                "sinkland-pages-v1:social-user:{}",
+                tag.social_username()
+            )));
+            let old_user = generate_user_random(&mut old_rng, &tag.social_username());
+            assert_eq!(user.display_name, old_user.display_name);
+            assert_eq!(user.bio, old_user.bio);
+            for seed in [0, 42, u64::MAX] {
+                let key = ThreadKey::new(tag, seed);
+                let post = tagged_post(key);
+                assert_eq!(post.author.username, user.username);
+                assert_eq!(post.author.display_name, user.display_name);
+                assert_eq!(post.content, tagged_post(key).content);
+                assert_eq!(post.id, key.social_post_id());
+            }
+        }
+    }
 }
 
 /// Generate a random username
@@ -1407,6 +1470,37 @@ pub fn generate_user_random<R: Rng>(rng: &mut R, username: &str) -> User {
         post_count,
         join_date,
         verified,
+    }
+}
+
+pub fn tagged_user(tag: Tag) -> User {
+    let username = tag.social_username();
+    let mut rng = ChaCha8Rng::seed_from_u64(simple_hash(&format!(
+        "sinkland-pages-v1:social-user:{username}"
+    )));
+    generate_user_random(&mut rng, &username)
+}
+
+pub fn tagged_post(key: ThreadKey) -> Post {
+    let mut rng =
+        ChaCha8Rng::seed_from_u64(simple_hash(&format!("sinkland-tagged-social-v1:{key}")));
+    let timestamp = format!("Sep {}, 2026", rng.gen_range(1..=23));
+    Post {
+        id: key.social_post_id(),
+        author: tagged_user(key.tag),
+        content: format!(
+            "{} It made me think about {}.",
+            key.tag.social_observation(),
+            key.tag.paper_topic()
+        ),
+        has_image: false,
+        image_id: None,
+        image_alt: None,
+        likes: rng.gen_range(0..350),
+        reposts: rng.gen_range(0..40),
+        replies: rng.gen_range(0..20),
+        timestamp: timestamp.clone(),
+        relative_time: timestamp,
     }
 }
 
