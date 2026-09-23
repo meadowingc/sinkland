@@ -37,10 +37,11 @@ sudo bash scripts/install-pi.sh --hostname sinkland.meadow.cafe
 ```
 
 The installer prompts privately for the tunnel token, verifies the latest
-release, and sets up low-priority Sinkland and cloudflared services. Run it
-again to update. It can't set up the Cloudflare hostname or DNS for you; don't
-put the tunnel token in the repo. If you installed cloudflared through mise,
-pass `--cloudflared "$(mise which cloudflared)"` when running the installer.
+release, and sets up low-priority Sinkland and cloudflared services. Pull the
+latest checkout and rerun it to update. It can't set up the Cloudflare
+hostname or DNS for you; don't put the tunnel token in the repo. If you
+installed cloudflared through mise, pass `--cloudflared "$(mise which cloudflared)"`
+when running the installer.
 See `bash scripts/install-pi.sh --help` for the other options.
 
 The poetry rhyme data uses the CMU Pronouncing Dictionary; its notice is in

@@ -98,10 +98,12 @@ import tarfile
 with tarfile.open(sys.argv[1]) as archive:
     for member in archive.getmembers():
         path = pathlib.PurePosixPath(member.name)
+        license_notice = path.parts == ("CMU-LICENSE.txt",) and member.isfile()
         if (path.is_absolute() or ".." in path.parts
                 or not (member.isfile() or member.isdir())
                 or (path.parts and path.parts[0] not in
-                    {"sinkland", "assets", "templates", "static", "VERSION"})):
+                    {"sinkland", "assets", "templates", "static", "VERSION"}
+                    and not license_notice)):
             sys.exit(f"Unsafe or unexpected archive entry: {member.name}")
 PY
     tar --extract --gzip --file "$archive" --directory "$destination" \

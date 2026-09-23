@@ -83,7 +83,7 @@ class InstallerTests(unittest.TestCase):
         }
         self.make_release("v0.1.0")
 
-    def make_release(self, version, unsafe=None):
+    def make_release(self, version, unsafe=None, include_license=True):
         files = {
             "sinkland": "#!/bin/sh\nexit 0\n",
             "VERSION": version + "\n",
@@ -92,6 +92,10 @@ class InstallerTests(unittest.TestCase):
             "templates/index.html.tera": "Hello",
             "static/hi.txt": "Hi",
         }
+        if include_license:
+            files["CMU-LICENSE.txt"] = (
+                SCRIPT.parent.parent / "corpus/poetry/CMU-LICENSE.txt"
+            ).read_text()
         archive = self.root / "downloads" / ASSET
         with tarfile.open(archive, "w:gz") as tar:
             for name, value in files.items():
@@ -151,6 +155,10 @@ class InstallerTests(unittest.TestCase):
         current = self.install_root / "current"
         self.assertEqual(current.resolve().name, "v0.1.0")
         self.assertEqual((current / "sinkland").stat().st_mode & 0o777, 0o755)
+        self.assertEqual(
+            (current / "CMU-LICENSE.txt").read_bytes(),
+            (SCRIPT.parent.parent / "corpus/poetry/CMU-LICENSE.txt").read_bytes(),
+        )
         self.assertEqual((self.config / "tunnel-token").read_text(), TOKEN)
         self.assertEqual((self.config / "tunnel-token").stat().st_mode & 0o777, 0o600)
         (self.config / "sinkland.env").write_text('SINKLAND_FRIENDS=["https://example.org"]\n')
@@ -223,6 +231,11 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue((self.install_root / "releases" / "v0.1.0").exists())
         self.assertEqual((self.config / "tunnel-token").read_text(), TOKEN)
 
+    def test_older_release_without_license_still_installs(self):
+        self.make_release("v0.2.0", include_license=False)
+        self.run_installer("--token-file", str(self.token_file), "--version", "v0.2.0")
+        self.assertFalse((self.install_root / "current" / "CMU-LICENSE.txt").exists())
+
     def test_failed_application_rolls_back(self):
         self.first_install()
         self.make_release("v0.2.0")
@@ -251,7 +264,8 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((self.install_root / "current").resolve().name, "v0.1.0")
 
     def test_unsafe_archives_are_rejected(self):
-        for member in ("../escape", "/absolute", "assets/link"):
+        for member in ("../escape", "/absolute", "assets/link",
+                       "CMU-LICENSE.txt/extra", "OTHER-LICENSE.txt"):
             with self.subTest(member=member):
                 self.make_release("v0.1.0", unsafe=member)
                 output = self.first_install(success=False)

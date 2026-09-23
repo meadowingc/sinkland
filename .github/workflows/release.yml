@@ -76,6 +76,12 @@ jobs:
             echo "Expected a static executable." >&2
             exit 1
           fi
+          tar -C package -czf dist/sinkland-linux-arm64.tar.gz .
+          mkdir -p checked-package
+          source scripts/install-pi.sh
+          version=$RELEASE_TAG
+          extract_release dist/sinkland-linux-arm64.tar.gz checked-package
+          cmp corpus/poetry/CMU-LICENSE.txt checked-package/CMU-LICENSE.txt
       - name: Smoke test the packaged application
         working-directory: package
         env:
@@ -103,7 +109,6 @@ jobs:
           python3 ../scripts/smoke-papers.py
       - name: Publish release
         run: |
-          tar -C package -czf dist/sinkland-linux-arm64.tar.gz .
           (cd dist && sha256sum sinkland-linux-arm64.tar.gz > sinkland-linux-arm64.tar.gz.sha256)
           cp scripts/install-pi.sh dist/
           gh release create "$RELEASE_TAG" dist/* --verify-tag --draft \
