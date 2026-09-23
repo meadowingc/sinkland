@@ -62,6 +62,9 @@ Names are not taken from researcher profiles, but coincidental matches to real
 people or institutions cannot be ruled out. An author's identity and affiliation
 stay consistent across papers; profile listings generate papers with that author
 first rather than claiming to index all their collaborations.
+Discovery, search, category, and author listings show a short, word-boundary
+excerpt of each paper's seeded abstract. The full abstract on the paper page
+uses the same generated experiment settings and observations as its tables.
 
 The **Cite this paper** panel provides a formatted citation and BibTeX with the
 complete ordered byline, plus a `.bib` download and permanent paper link. Copy buttons use the
@@ -76,7 +79,10 @@ short papers are not biased toward the first few types. Each paper uses only its
 generated **2–10 figure subset**; because there are twelve families, no paper
 contains every family and a family is not repeated within one paper. Figure/table captions,
 experiment contexts, units, and 3–5 configuration names are generated from each
-paper's stable identity rather than repeated global baseline labels. Tables
+paper's stable identity rather than repeated global baseline labels. New `v2`
+papers draw from field-specific method names, sometimes varying a technique or
+including a topic-specific configuration, instead of giving every result the
+same adjective-and-noun pattern. Tables
 come from each experiment section, without a separate table-count cap (a
 ten-experiment paper has twenty tables). Tables, numeric statements, and charts
 all derive from the same observations. The uncertainty bars use the documented
@@ -139,8 +145,11 @@ coverage or corrupt inputs fail the build. The supported broad categories are
 `cs`, `math`, `physics`, `stat`, `q-bio`, `q-fin`, `econ`, and `eess`.
 
 The `v1` identity namespace covers both generator logic and corpus semantics.
-Freeze them once released; content-breaking changes need a new namespace and an
-explicit old-URL compatibility decision. Live footer counters are not part of the
+Existing `v1` URLs retain their original configurations and abstracts. New
+discoveries and their references and cross-section links use `v2` identities
+for the revised abstracts and result names; `v1` papers continue to reference `v1`
+papers. Content-breaking changes require another namespace and an explicit
+old-URL compatibility decision. Live footer counters are not part of the
 deterministic paper content. Keep dependency versions locked for reproducibility.
 
 ### Development checks

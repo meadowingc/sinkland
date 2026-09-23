@@ -500,6 +500,7 @@ mod tests {
     #[test]
     fn every_family_renders_svg_without_native_fonts() {
         let id = PaperId {
+            revision: 2,
             category: 0,
             author: 0,
             topic: 0,

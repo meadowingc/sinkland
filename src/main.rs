@@ -502,11 +502,8 @@ fn blog_index() -> Result<Html<String>, poem::Error> {
         )
     });
     let mut context = Context::new();
-    context.insert("heading", "Classic Literature Archive");
-    context.insert(
-        "intro",
-        "A changing shelf of excerpts and stray observations. Open an entry to find its place in the archive.",
-    );
+    context.insert("heading", "Blog");
+    context.insert("intro", "Explore a selection of random blog posts.");
     context.insert("entries", &entries);
     context.insert("refresh_url", "/blog/blog-posts");
     context.insert("is_haiku", &false);

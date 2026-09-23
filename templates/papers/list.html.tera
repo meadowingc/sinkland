@@ -7,7 +7,7 @@
 <article class="paper-card">
     <h2><a href="/papers/p/{{ entry.id | escape }}" rel="nofollow">{{ entry.title | escape }}</a></h2>
     <div class="paper-meta">{% for researcher in entry.authors %}<a href="/papers/author/{{ researcher.id | escape }}" rel="nofollow">{{ researcher.name | escape }}</a>{% if not loop.last %}, {% endif %}{% endfor %} · {{ entry.year }} · {{ entry.category_name | escape }}</div>
-    <p>An investigation of {{ entry.topic | escape }}.</p>
+    <p class="paper-preview">{{ entry.abstract_preview | escape }}</p>
 </article>
 {% endfor %}
 <nav class="pagination" aria-label="Discovery pages">

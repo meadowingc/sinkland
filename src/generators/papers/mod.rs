@@ -114,6 +114,7 @@ const TOPICS: [[&str; 6]; 8] = [
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PaperId {
+    pub revision: u8,
     pub category: usize,
     pub author: u32,
     pub topic: usize,
@@ -124,8 +125,8 @@ impl fmt::Display for PaperId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "v1.{}.{:08x}.{}.{:016x}",
-            CATEGORIES[self.category], self.author, self.topic, self.nonce
+            "v{}.{}.{:08x}.{}.{:016x}",
+            self.revision, CATEGORIES[self.category], self.author, self.topic, self.nonce
         )
     }
 }
@@ -137,7 +138,7 @@ impl FromStr for PaperId {
             return Err("Paper ID too long");
         }
         let parts: Vec<_> = value.split('.').collect();
-        if parts.len() != 5 || parts[0] != "v1" {
+        if parts.len() != 5 || !["v1", "v2"].contains(&parts[0]) {
             return Err("Invalid paper revision or ID");
         }
         let category = CATEGORIES
@@ -145,6 +146,7 @@ impl FromStr for PaperId {
             .position(|category| *category == parts[1])
             .ok_or("Unknown category")?;
         let id = Self {
+            revision: parts[0][1..].parse().map_err(|_| "Invalid revision")?,
             category,
             author: u32::from_str_radix(parts[2], 16).map_err(|_| "Invalid author ID")?,
             topic: parts[3].parse().map_err(|_| "Invalid topic")?,
@@ -391,6 +393,7 @@ fn capitalize_title(value: &str) -> String {
 
 pub fn random_metadata(rng: &mut impl Rng) -> Metadata {
     metadata(&PaperId {
+        revision: 2,
         category: rng.gen_range(0..CATEGORIES.len()),
         author: rng.r#gen(),
         topic: rng.gen_range(0..6),
@@ -436,6 +439,17 @@ pub fn discover(
     page: u32,
     owner: Option<u32>,
 ) -> Vec<Metadata> {
+    discover_revision(query, category, seed, page, owner, 2)
+}
+
+fn discover_revision(
+    query: &str,
+    category: Option<usize>,
+    seed: u64,
+    page: u32,
+    owner: Option<u32>,
+    revision: u8,
+) -> Vec<Metadata> {
     let mut rng = rng(&format!(
         "discovery:{seed}:{page}:{query}:{category:?}:{owner:?}"
     ));
@@ -462,6 +476,7 @@ pub fn discover(
                 )
             });
             metadata(&PaperId {
+                revision,
                 category: cat,
                 topic,
                 author: owner.unwrap_or_else(|| rng.r#gen()),
@@ -613,6 +628,133 @@ fn configuration_names(id: &PaperId) -> Vec<String> {
         "Coupled",
         "Stochastic",
     ];
+    if id.revision == 2 {
+        let methods = [
+            [
+                "Graph partitioning",
+                "Message passing",
+                "Event-driven sampling",
+                "Low-rank projection",
+                "Multistage scheduling",
+                "Kernel interpolation",
+                "Distributed averaging",
+                "Sparse coding",
+                "Constraint propagation",
+                "Sequential routing",
+            ],
+            [
+                "Spectral projection",
+                "Fixed-point iteration",
+                "Variational approximation",
+                "Kernel smoothing",
+                "Topological filtration",
+                "Random walk sampling",
+                "Convex relaxation",
+                "Geodesic interpolation",
+                "Graph rewiring",
+                "Operator splitting",
+            ],
+            [
+                "Spectral decomposition",
+                "Phase-space sampling",
+                "Lattice transport",
+                "Perturbative expansion",
+                "Mode coupling",
+                "Field reconstruction",
+                "Finite-volume discretization",
+                "Wavelet analysis",
+                "Particle filtering",
+                "Ensemble integration",
+            ],
+            [
+                "Bootstrap resampling",
+                "Partial pooling",
+                "Robust regression",
+                "Posterior prediction",
+                "Inverse weighting",
+                "Cross-validation",
+                "Shrinkage estimation",
+                "Spline smoothing",
+                "Quantile calibration",
+                "Hierarchical inference",
+            ],
+            [
+                "Longitudinal smoothing",
+                "Mixed-effects estimation",
+                "Network inference",
+                "Spatial clustering",
+                "Hierarchical aggregation",
+                "Sparse regression",
+                "Temporal alignment",
+                "Multiscale embedding",
+                "Population stratification",
+                "Trajectory reconstruction",
+            ],
+            [
+                "Factor decomposition",
+                "Volatility targeting",
+                "Rolling-window estimation",
+                "Risk parity",
+                "Regime switching",
+                "Liquidity adjustment",
+                "Tail-risk estimation",
+                "Portfolio rebalancing",
+                "Scenario weighting",
+                "Hedged exposure",
+            ],
+            [
+                "Instrumental variables",
+                "Difference-in-differences",
+                "Synthetic control",
+                "Panel regression",
+                "Spatial equilibrium",
+                "Cohort weighting",
+                "Event study",
+                "Counterfactual matching",
+                "Structural estimation",
+                "Distributional accounting",
+            ],
+            [
+                "Adaptive filtering",
+                "Kalman estimation",
+                "Model predictive control",
+                "Frequency-response analysis",
+                "Channel equalization",
+                "Sparse reconstruction",
+                "Sensor fusion",
+                "Feedback linearization",
+                "State-space identification",
+                "Waveform tracking",
+            ],
+        ][id.category];
+        let group_count = rng.gen_range(3..=5);
+        let mut names = methods
+            .choose_multiple(&mut rng, group_count)
+            .map(|method| {
+                if rng.gen_bool(0.35) {
+                    let method = if *method == "Kalman estimation" {
+                        (*method).to_owned()
+                    } else {
+                        method.to_lowercase()
+                    };
+                    format!(
+                        "{} {method}",
+                        ["Robust", "Joint", "Multiscale", "Two-stage"]
+                            .choose(&mut rng)
+                            .unwrap()
+                    )
+                } else {
+                    (*method).to_owned()
+                }
+            })
+            .collect::<Vec<_>>();
+        if rng.gen_bool(0.55) {
+            let index = rng.gen_range(0..names.len());
+            names[index] = format!("{} {subject}", prefixes.choose(&mut rng).unwrap());
+        }
+        names.shuffle(&mut rng);
+        return names;
+    }
     let group_count = rng.gen_range(3..=5);
     let mut names = prefixes
         .choose_multiple(&mut rng, group_count)
@@ -1000,6 +1142,168 @@ pub struct Paper {
     pub related: Vec<Metadata>,
 }
 
+fn paper_abstract(
+    id: &PaperId,
+    metadata: &Metadata,
+    style: Archetype,
+    count: usize,
+    first: &Experiment,
+    last: &Experiment,
+) -> String {
+    let mut rng = rng(&format!("{id}:abstract-v2"));
+    let topic = &metadata.topic;
+    let opening = match style {
+        Archetype::Comparative => [
+            format!("Differences among configurations make {topic} difficult to characterize across changing conditions."),
+            format!("For {topic}, measured behavior can depend on how alternative configurations are evaluated."),
+            format!("This study examines how configurations of {topic} compare when observation conditions vary."),
+        ],
+        Archetype::Methods => [
+            format!("We assess whether evaluation choices alter the measured behavior of {topic}."),
+            format!("A consistent comparison of {topic} calls for attention to both response and measurement variability."),
+            format!("To examine {topic} across operating conditions, we apply a common measurement protocol."),
+        ],
+        Archetype::Observational => [
+            format!("Evidence about {topic} depends on the setting observed and the distribution of its measurements."),
+            format!("This work characterizes variation in {topic} across distinct observation settings."),
+            format!("The distributional behavior of {topic} is examined under multiple operating conditions."),
+        ],
+    }
+    .choose(&mut rng)
+    .unwrap()
+    .clone();
+    let setting = &first.context;
+    let unit = &first.unit;
+    let configurations = first.series.len();
+    let observations = first.series[0].summary.n;
+    let design = [
+        format!(
+            "Across {count} settings, we compare {configurations} configurations; \
+             the {setting} includes {observations} observations per configuration \
+             measured as {unit}."
+        ),
+        format!(
+            "The analysis follows {configurations} configurations over {count} settings, \
+             beginning with {observations} observations per configuration in the {setting}."
+        ),
+        format!(
+            "Using {count} evaluation settings, we summarize response and dispersion for \
+             {configurations} configurations; the {setting} records {observations} \
+             measurements per configuration."
+        ),
+    ]
+    .choose(&mut rng)
+    .unwrap()
+    .clone();
+    let leader = first
+        .series
+        .iter()
+        .max_by(|a, b| a.summary.mean.total_cmp(&b.summary.mean))
+        .unwrap();
+    let lower = first
+        .series
+        .iter()
+        .min_by(|a, b| a.summary.mean.total_cmp(&b.summary.mean))
+        .unwrap();
+    let gap = leader.summary.mean - lower.summary.mean;
+    let findings = [
+        format!(
+            "In the {setting}, {} has the highest observed mean ({:.2} {unit}), \
+             whereas {} records {:.2}, a difference of {gap:.2} {unit}.",
+            leader.name, leader.summary.mean, lower.name, lower.summary.mean
+        ),
+        format!(
+            "Mean {unit} in the {setting} ranges from {:.2} for {} to {:.2} for {}, \
+             with {gap:.2} separating the configurations.",
+            lower.summary.mean, lower.name, leader.summary.mean, leader.name
+        ),
+        format!(
+            "The {setting} yields a mean of {:.2} {unit} for {} (sample SD {:.2}); \
+             {} reaches {:.2} in the same setting.",
+            lower.summary.mean, lower.name, lower.summary.sd, leader.name, leader.summary.mean
+        ),
+        format!(
+            "In the {setting}, {} averages {:.2} {unit}; in the final setting \
+             ({}) {} records {:.2} {}.",
+            leader.name,
+            leader.summary.mean,
+            last.context,
+            last.series[0].name,
+            last.series[0].summary.mean,
+            last.unit
+        ),
+    ]
+    .choose(&mut rng)
+    .unwrap()
+    .clone();
+    let interpretation = [
+        "These contrasts are descriptive and depend on the reported observation conditions.".to_owned(),
+        format!("The results show why both configuration choice and measurement spread matter when interpreting {topic}."),
+        format!("Taken together, the observations motivate closer attention to variability in {topic} across settings."),
+        "The resulting contrast describes setting-specific measurements rather than a universal ranking.".to_owned(),
+    ]
+    .choose(&mut rng)
+    .unwrap()
+    .clone();
+    format!("{opening} {design} {findings} {interpretation}")
+}
+
+fn abstract_for_revision(
+    id: &PaperId,
+    metadata: &Metadata,
+    style: Archetype,
+    count: usize,
+    first: &Experiment,
+    last: &Experiment,
+) -> String {
+    if id.revision == 1 {
+        return format!(
+            "We investigate {} across {count} evaluation settings using {} \
+             consistently named configurations. Each setting comprises {}–{} \
+             observations per configuration, with descriptive estimates of \
+             central tendency, dispersion, and quantiles. In the first setting, \
+             {} records a mean of {:.2} {} and sample SD {:.2}; the corresponding \
+             results for other configurations and settings appear in the tables \
+             and figures. Comparisons are descriptive and should be interpreted \
+             within their reported units and observation conditions.",
+            metadata.topic,
+            first.series.len(),
+            (0..count)
+                .map(|index| experiment(id, index).series[0].summary.n)
+                .min()
+                .unwrap(),
+            (0..count)
+                .map(|index| experiment(id, index).series[0].summary.n)
+                .max()
+                .unwrap(),
+            first.series[0].name,
+            first.series[0].summary.mean,
+            first.unit,
+            first.series[0].summary.sd
+        );
+    }
+    paper_abstract(id, metadata, style, count, first, last)
+}
+
+pub fn abstract_preview(metadata: &Metadata) -> Result<String, &'static str> {
+    let id: PaperId = metadata.id.parse()?;
+    let count = figure_count(&id);
+    let text = abstract_for_revision(
+        &id,
+        metadata,
+        archetype(&id),
+        count,
+        &experiment(&id, 0),
+        &experiment(&id, count - 1),
+    );
+    const MAX_CHARS: usize = 360;
+    let Some((cutoff, _)) = text.char_indices().nth(MAX_CHARS - 1) else {
+        return Ok(text);
+    };
+    let end = text[..cutoff].rfind(char::is_whitespace).unwrap_or(cutoff);
+    Ok(format!("{}…", text[..end].trim_end()))
+}
+
 pub fn generate(id: &PaperId) -> Paper {
     let metadata = metadata(id);
     let style = archetype(id);
@@ -1311,6 +1615,7 @@ pub fn generate(id: &PaperId) -> Paper {
     let mut references = Vec::new();
     for _ in 0..8 {
         let target = PaperId {
+            revision: id.revision,
             category: id.category,
             author: ref_rng.r#gen(),
             topic: ref_rng.gen_range(0..6),
@@ -1320,41 +1625,19 @@ pub fn generate(id: &PaperId) -> Paper {
             references.push(self::metadata(&target));
         }
     }
-    let related = discover(
+    let related = discover_revision(
         "",
         Some(id.category),
         fingerprint(&format!("{id}:related")),
         0,
         None,
+        id.revision,
     )
     .into_iter()
     .take(4)
     .collect();
     Paper {
-        abstract_text: format!(
-            "We investigate {} across {count} evaluation settings using {} \
-             consistently named configurations. Each setting comprises {}–{} \
-             observations per configuration, with descriptive estimates of \
-             central tendency, dispersion, and quantiles. In the first setting, \
-             {} records a mean of {:.2} {} and sample SD {:.2}; the corresponding \
-             results for other configurations and settings appear in the tables \
-             and figures. Comparisons are descriptive and should be interpreted \
-             within their reported units and observation conditions.",
-            metadata.topic,
-            first.series.len(),
-            (0..count)
-                .map(|index| experiment(id, index).series[0].summary.n)
-                .min()
-                .unwrap(),
-            (0..count)
-                .map(|index| experiment(id, index).series[0].summary.n)
-                .max()
-                .unwrap(),
-            first.series[0].name,
-            first.series[0].summary.mean,
-            first.unit,
-            first.series[0].summary.sd
-        ),
+        abstract_text: abstract_for_revision(id, &metadata, style, count, &first, &last),
         metadata,
         sections,
         references,
@@ -1367,6 +1650,7 @@ mod tests {
     use super::*;
     fn id(nonce: u64) -> PaperId {
         PaperId {
+            revision: 2,
             category: 0,
             author: 12,
             topic: 3,
@@ -1375,18 +1659,152 @@ mod tests {
     }
 
     #[test]
+    fn revisioned_results_keep_legacy_papers_stable_and_vary_new_labels() {
+        let legacy: PaperId = "v1.cs.0000000c.3.000000000000000f".parse().unwrap();
+        let old = generate(&legacy);
+        assert!(
+            old.abstract_text
+                .starts_with("We investigate recursive inference")
+        );
+        assert!(
+            old.references
+                .iter()
+                .all(|entry| entry.id.starts_with("v1."))
+        );
+        assert!(old.related.iter().all(|entry| entry.id.starts_with("v1.")));
+        let old_names = configuration_names(&legacy);
+        assert_eq!(
+            old_names,
+            [
+                "Hierarchical replica",
+                "Sparse replica",
+                "Static replica",
+                "Dynamic replica",
+                "Constrained replica"
+            ]
+        );
+        assert_eq!(
+            experiment(&legacy, 0)
+                .series
+                .iter()
+                .map(|series| series.name.clone())
+                .collect::<Vec<_>>(),
+            old_names
+        );
+        assert_eq!(old.metadata.id, legacy.to_string());
+        assert_ne!(
+            old_names,
+            configuration_names(&PaperId {
+                revision: 2,
+                ..legacy.clone()
+            })
+        );
+
+        let mut labels = BTreeSet::new();
+        let mut total = 0;
+        let mut adjective_subject = 0;
+        for category in 0..CATEGORIES.len() {
+            for nonce in 0..20 {
+                let id = PaperId {
+                    revision: 2,
+                    category,
+                    author: 12,
+                    topic: nonce % 6,
+                    nonce: nonce as u64,
+                };
+                let old_subject = configuration_names(&PaperId {
+                    revision: 1,
+                    ..id.clone()
+                })[0]
+                    .split_whitespace()
+                    .last()
+                    .unwrap()
+                    .to_owned();
+                let names = configuration_names(&id);
+                assert!((3..=5).contains(&names.len()));
+                assert_eq!(names.iter().collect::<BTreeSet<_>>().len(), names.len());
+                assert_eq!(
+                    names,
+                    experiment(&id, 0)
+                        .series
+                        .iter()
+                        .map(|series| series.name.clone())
+                        .collect::<Vec<_>>()
+                );
+                for name in names {
+                    adjective_subject += usize::from(name.ends_with(&format!(" {old_subject}")));
+                    total += 1;
+                    labels.insert(name);
+                }
+            }
+        }
+        assert!(labels.len() > 100, "{} distinct labels", labels.len());
+        assert!(
+            adjective_subject * 4 < total,
+            "{adjective_subject}/{total} adjective-subject labels"
+        );
+    }
+
+    #[test]
+    fn listing_previews_match_varied_data_grounded_abstracts() {
+        let mut openings = BTreeSet::new();
+        let mut truncated = 0;
+        for category in 0..CATEGORIES.len() {
+            for nonce in 0..8 {
+                let id = PaperId {
+                    revision: 2,
+                    category,
+                    author: 12,
+                    topic: nonce % 6,
+                    nonce: nonce as u64,
+                };
+                let paper = generate(&id);
+                let preview = abstract_preview(&paper.metadata).unwrap();
+                let text = &paper.abstract_text;
+                let beginning = preview.strip_suffix('…').unwrap_or(&preview);
+                assert!(text.starts_with(beginning), "{id}");
+                assert!(preview.chars().count() <= 360, "{id}");
+                if preview.ends_with('…') {
+                    truncated += 1;
+                    assert!(beginning.ends_with(|c: char| !c.is_whitespace()), "{id}");
+                } else {
+                    assert_eq!(&preview, text);
+                }
+                let words = text.split_whitespace().count();
+                assert!((60..=130).contains(&words), "{id}: {words}");
+                let first = experiment(&id, 0);
+                assert!(text.contains(&first.context), "{id}");
+                assert!(
+                    text.contains(&first.series[0].summary.n.to_string()),
+                    "{id}"
+                );
+                assert!(!text.starts_with("We investigate"), "{id}");
+                openings.insert(text.split(". ").next().unwrap().to_owned());
+            }
+        }
+        assert!(truncated >= 40, "{truncated}/64 previews were truncated");
+        assert!(openings.len() >= 8, "{} openings", openings.len());
+    }
+
+    #[test]
     fn identities_and_discoveries_are_consistent() {
         let original = id(15);
         assert_eq!(original.to_string().parse::<PaperId>().unwrap(), original);
         for bad in [
-            "v2.cs.0000000c.3.000000000000000f",
+            "v3.cs.0000000c.3.000000000000000f",
             "v1.cs.c.3.f",
             "v1.cs.0000000c.9.000000000000000f",
             "<script>",
         ] {
             assert!(bad.parse::<PaperId>().is_err());
         }
+        let v1: PaperId = "v1.cs.0000000c.3.000000000000000f".parse().unwrap();
+        let v2: PaperId = "v2.cs.0000000c.3.000000000000000f".parse().unwrap();
+        assert_eq!(v1.revision, 1);
+        assert_eq!(v2.revision, 2);
+        assert_ne!(v1, v2);
         let results = discover("learning", None, 42, 0, Some(12));
+        assert!(results.iter().all(|entry| entry.id.starts_with("v2.")));
         assert_eq!(results, discover("learning", None, 42, 0, Some(12)));
         assert_ne!(results, discover("learning", None, 43, 0, Some(12)));
         for result in results {
@@ -1452,6 +1870,7 @@ mod tests {
         let mut configurations = BTreeSet::new();
         for nonce in 0..100 {
             let id = PaperId {
+                revision: 2,
                 category: nonce as usize % CATEGORIES.len(),
                 author: 12,
                 topic: nonce as usize / CATEGORIES.len() % 6,
@@ -1520,6 +1939,7 @@ mod tests {
         let mut lengths_by_count = std::collections::BTreeMap::<usize, Vec<usize>>::new();
         for nonce in 0..144 {
             let id = PaperId {
+                revision: 2,
                 category: nonce as usize % CATEGORIES.len(),
                 author: 12,
                 topic: nonce as usize / CATEGORIES.len() % 6,
@@ -1621,6 +2041,7 @@ mod tests {
         let mut towards = 0;
         for nonce in 0..400 {
             let title = metadata(&PaperId {
+                revision: 2,
                 category: nonce as usize % CATEGORIES.len(),
                 author: 12,
                 topic: nonce as usize / CATEGORIES.len() % 6,

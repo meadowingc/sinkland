@@ -9,6 +9,7 @@
 .research-search button { padding: 12px 20px; background: #245c80; color: white; border: 0; font: inherit; cursor: pointer; }
 .paper-card { padding: 22px 0; border-bottom: 1px solid #dce2e5; }
 .paper-card h2 { margin: 0 0 10px; }
+.paper-preview { max-width: 76ch; line-height: 1.65; margin: 12px 0 0; text-align: left; }
 .paper-meta { color: #586773; font-size: .95em; }
 .paper-header { border-bottom: 2px solid #245c80; padding-bottom: 20px; }
 .paper-header h1 { border: 0; margin-bottom: 10px; }
@@ -62,7 +63,7 @@ figcaption { color: #586773; margin: 8px 0; }
 {% endblock extra_styles %}
 {% block content %}
 <nav class="research-nav" aria-label="Research categories">
-    <a href="/papers" rel="nofollow">All discoveries</a>
+    <a href="/papers" rel="nofollow">All</a>
     {% for category in categories %}<a href="/papers/category/{{ category.0 | escape }}" rel="nofollow">{{ category.1 | escape }}</a>{% endfor %}
 </nav>
 <form class="research-search" action="/papers/search" method="get" role="search">

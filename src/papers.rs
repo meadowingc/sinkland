@@ -11,7 +11,7 @@ use poem::{
     web::{Html, Path, Query},
 };
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tera::Context;
 
 pub fn routes() -> Route {
@@ -67,6 +67,13 @@ struct DiscoveryQuery {
     page: u32,
 }
 
+#[derive(Serialize)]
+struct ListEntry {
+    #[serde(flatten)]
+    metadata: generator::Metadata,
+    abstract_preview: String,
+}
+
 fn discovery(
     query: DiscoveryQuery,
     selected: Option<usize>,
@@ -90,7 +97,15 @@ fn discovery(
         }
         None => rand::thread_rng().r#gen(),
     };
-    let results = generator::discover(&query.q, selected, seed, query.page, owner);
+    let results = generator::discover(&query.q, selected, seed, query.page, owner)
+        .into_iter()
+        .map(|metadata| {
+            Ok(ListEntry {
+                abstract_preview: generator::abstract_preview(&metadata).map_err(server_error)?,
+                metadata,
+            })
+        })
+        .collect::<Result<Vec<_>, poem::Error>>()?;
     let title = if let Some(id) = owner {
         format!("Publications by {}", generator::author(id).name)
     } else if let Some(index) = selected {
@@ -210,6 +225,34 @@ mod tests {
     use super::*;
     use crate::get_visit_counts;
     use poem::{Endpoint, Request, http::Uri};
+
+    #[tokio::test]
+    async fn discovery_routes_render_abstract_previews() {
+        let app = routes();
+        for path in [
+            "/?seed=000000000000002a",
+            "/search?q=inference&seed=000000000000002a",
+            "/category/cs?seed=000000000000002a",
+            "/author/0000000c",
+        ] {
+            let response = app
+                .get_response(
+                    Request::builder()
+                        .uri(path.parse::<Uri>().unwrap())
+                        .finish(),
+                )
+                .await;
+            assert_eq!(response.status(), StatusCode::OK, "{path}");
+            let body = response.into_body().into_string().await.unwrap();
+            assert_eq!(
+                body.matches("class=\"paper-preview\"").count(),
+                12,
+                "{path}"
+            );
+            assert_eq!(body.matches("href=\"/papers/p/v2.").count(), 12, "{path}");
+            assert!(!body.contains("An investigation of "), "{path}");
+        }
+    }
 
     #[tokio::test]
     async fn pages_and_figures_validate_inputs() {
