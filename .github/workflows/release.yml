@@ -49,10 +49,6 @@ jobs:
           bash -n scripts/install-pi.sh
           shellcheck scripts/install-pi.sh
           python3 -m unittest discover -s tests -p 'test_*.py' -v
-      - uses: actions/cache@v4
-        with:
-          path: target/sinkland-paper-corpus
-          key: paper-corpus-v2-${{ hashFiles('corpus/papers/manifest.json', 'scripts/prepare-paper-corpus.py') }}
       - name: Build and test static ARM64 binary
         run: |
           cargo +stable test --locked --release --target aarch64-unknown-linux-musl

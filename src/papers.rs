@@ -1,6 +1,6 @@
 use crate::{
     TEMPLATES,
-    generators::papers::{self as generator, PaperId, model::CATEGORIES},
+    generators::papers::{self as generator, CATEGORIES, PaperId},
     increment_paper_visits, insert_visit_counts,
 };
 use poem::{
@@ -262,9 +262,9 @@ mod tests {
             "/search?q=learning",
             "/category/cs",
             "/author/0000000c",
-            "/p/v1.cs.0000000c.3.000000000000000f",
-            "/p/v1.cs.0000000c.3.000000000000000f/citation.bib",
-            "/p/v1.cs.0000000c.3.000000000000000f/figures/0",
+            "/p/v2.cs.0000000c.3.000000000000000f",
+            "/p/v2.cs.0000000c.3.000000000000000f/citation.bib",
+            "/p/v2.cs.0000000c.3.000000000000000f/figures/0",
         ] {
             let response = app
                 .get_response(
@@ -280,9 +280,12 @@ mod tests {
             "/author/xyz",
             "/p/nope",
             "/p/nope/citation.bib",
+            "/p/v1.cs.0000000c.3.000000000000000f",
+            "/p/v1.cs.0000000c.3.000000000000000f/citation.bib",
+            "/p/v1.cs.0000000c.3.000000000000000f/figures/0",
             "/sources",
             "/corpus-credits",
-            "/p/v1.cs.0000000c.3.000000000000000f/figures/99",
+            "/p/v2.cs.0000000c.3.000000000000000f/figures/99",
         ] {
             assert_eq!(
                 app.get_response(
@@ -326,7 +329,7 @@ mod tests {
         app.get_response(
             Request::builder()
                 .uri(
-                    "/p/v1.cs.0000000c.3.000000000000000f/figures/0"
+                    "/p/v2.cs.0000000c.3.000000000000000f/figures/0"
                         .parse::<Uri>()
                         .unwrap(),
                 )
@@ -334,7 +337,7 @@ mod tests {
         )
         .await;
         assert_eq!(get_visit_counts().papers, before);
-        let id: PaperId = "v1.cs.0000000c.3.000000000000000f".parse().unwrap();
+        let id: PaperId = "v2.cs.0000000c.3.000000000000000f".parse().unwrap();
         let expected = generator::citation(&generator::metadata(&id));
         let response = app
             .get_response(

@@ -888,7 +888,6 @@ fn routes() -> Route {
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    Lazy::force(&generators::papers::MODEL);
     let app = routes();
 
     let bind_address = match std::env::var("SINKLAND_BIND") {
@@ -1099,6 +1098,15 @@ mod tests {
             .to_owned()
     }
 
+    fn unescape_template_text(text: &str) -> String {
+        text.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#x27;", "'")
+            .replace("&#x2F;", "/")
+            .replace("&amp;", "&")
+    }
+
     #[tokio::test]
     async fn blog_and_haiku_pages_repeat_by_url() {
         for (first, second) in [
@@ -1148,7 +1156,18 @@ mod tests {
                 if section == "/blog/archive/" {
                     let slug = url.strip_prefix("/blog/").unwrap();
                     let excerpt = blog::generate(slug).excerpt().to_owned();
-                    assert!(card.contains(&excerpt[..80]), "{url}");
+                    let preview = card
+                        .split_once("<p class=\"collection-preview\">")
+                        .unwrap()
+                        .1
+                        .split_once("</p>")
+                        .unwrap()
+                        .0;
+                    assert!(
+                        unescape_template_text(preview)
+                            .starts_with(&excerpt.chars().take(80).collect::<String>()),
+                        "{url}"
+                    );
                     let opening = excerpt
                         .split_whitespace()
                         .take(2)
@@ -1177,20 +1196,73 @@ mod tests {
             let url = url.replace("&#x2F;", "/");
             if let Some(slug) = url.strip_prefix("/blog/") {
                 let post = blog::generate(slug);
+                let title = after_href
+                    .split_once('>')
+                    .unwrap()
+                    .1
+                    .split_once("</a>")
+                    .unwrap()
+                    .0;
+                let preview = after_href
+                    .split_once("<p class=\"featured-preview\">")
+                    .unwrap()
+                    .1
+                    .split_once("</p>")
+                    .unwrap()
+                    .0;
                 assert!(
-                    after_href.contains(&format!(">{}</a>", post.title)),
+                    unescape_template_text(preview)
+                        .starts_with(&post.excerpt().chars().take(80).collect::<String>()),
                     "{url}"
                 );
-                assert!(after_href.contains(&post.excerpt()[..80]), "{url}");
                 let destination = page_content(&url).await;
-                assert!(
-                    destination.contains(&format!("<h1>{}</h1>", post.title)),
-                    "{url}"
-                );
+                assert!(destination.contains(&format!("<h1>{title}</h1>")), "{url}");
                 internal += 1;
             }
         }
         assert!(internal > 0);
+    }
+
+    #[tokio::test]
+    async fn book_prose_modes_render_original_content() {
+        let mut full_post = false;
+        let mut extra_paragraph = false;
+        for n in 0..512 {
+            let slug = format!("prose-render/{n:016x}");
+            let post = blog::generate(&slug);
+            let mode = if post.sections.len() == 3
+                && post.sections[1].heading.as_deref() == Some("What I went back for")
+            {
+                &mut full_post
+            } else if post
+                .sections
+                .iter()
+                .map(|s| s.paragraphs.len())
+                .sum::<usize>()
+                >= 9
+            {
+                &mut extra_paragraph
+            } else {
+                continue;
+            };
+            let html = page_content(&format!("/blog/{slug}")).await;
+            assert!(!html.contains("<blockquote>"));
+            assert!(!html.contains("Project Gutenberg"));
+            let heading = html
+                .split_once("<h1>")
+                .unwrap()
+                .1
+                .split_once("</h1>")
+                .unwrap()
+                .0;
+            assert_eq!(unescape_template_text(heading), post.title);
+            assert_eq!(post.title, blog::title_for(&slug));
+            *mode = true;
+            if full_post && extra_paragraph {
+                break;
+            }
+        }
+        assert!(full_post && extra_paragraph);
     }
 
     #[test]

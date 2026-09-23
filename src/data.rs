@@ -4,7 +4,20 @@ use std::collections::{BTreeSet, HashSet};
 
 const BLOG_TEXTURE_WORDS: &[&str] = &[
     "quiet", "familiar", "strange", "ordinary", "gentle", "still", "small", "distant", "patient",
-    "clear", "old", "new", "warm", "empty",
+    "clear", "old", "new", "warm", "empty", "narrow", "pale", "faint", "restless", "faded",
+    "bright", "soft", "dark", "sudden", "silent",
+];
+const BLOG_MOTIF_WORDS: &[&str] = &[
+    "page", "line", "letter", "book", "paper", "ink", "road", "path", "window", "street", "garden",
+    "door", "tree", "stone", "clock", "table", "room", "light", "shadow", "wall", "gate", "river",
+    "hand", "silence",
+];
+const BLOG_VERB_WORDS: &[&str] = &[
+    "noticed",
+    "remembered",
+    "observed",
+    "considered",
+    "recalled",
 ];
 
 // Load .env file on first access
@@ -58,12 +71,16 @@ pub struct BookData {
     pub titles: Vec<String>,
     pub sentences: Vec<String>,
     pub blog_textures: Vec<&'static str>,
+    pub blog_motifs: Vec<&'static str>,
+    pub blog_verbs: Vec<&'static str>,
 }
 
 pub static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
     let mut titles = Vec::new();
     let mut sentences = Vec::new();
     let mut blog_textures = BTreeSet::new();
+    let mut blog_motifs = BTreeSet::new();
+    let mut blog_verbs = BTreeSet::new();
 
     // Read all .txt files from the books directory
     let books_dir = "assets/books";
@@ -90,18 +107,6 @@ pub static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
             }
         };
 
-        if !file_path.ends_with("meadow__blog_posts.txt") {
-            for word in content.split_whitespace() {
-                let word = word.trim_matches(|character: char| !character.is_ascii_alphabetic());
-                if let Some(&candidate) = BLOG_TEXTURE_WORDS
-                    .iter()
-                    .find(|candidate| word.eq_ignore_ascii_case(candidate))
-                {
-                    blog_textures.insert(candidate);
-                }
-            }
-        }
-
         // Find the actual book content (after START marker, before END marker)
         let start_marker = "*** START OF";
         let end_marker = "*** END OF";
@@ -119,6 +124,36 @@ pub static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
 
         let end_pos = content.find(end_marker).unwrap_or(content.len());
         let book_content = &content[start_pos..end_pos];
+
+        if file_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| {
+                matches!(
+                    name,
+                    "christmas_carol.txt"
+                        | "dracula.txt"
+                        | "frankenstein.txt"
+                        | "jekyll_hyde.txt"
+                        | "pride_prejudice.txt"
+                )
+            })
+        {
+            for word in book_content.split_whitespace() {
+                let word = word.trim_matches(|c: char| !c.is_ascii_alphabetic());
+                for (bank, collected) in [
+                    (BLOG_TEXTURE_WORDS, &mut blog_textures),
+                    (BLOG_MOTIF_WORDS, &mut blog_motifs),
+                    (BLOG_VERB_WORDS, &mut blog_verbs),
+                ] {
+                    if let Some(&candidate) =
+                        bank.iter().find(|item| word.eq_ignore_ascii_case(item))
+                    {
+                        collected.insert(candidate);
+                    }
+                }
+            }
+        }
 
         // Extract chapter titles (all caps lines with multiple words)
         for line in book_content.lines() {
@@ -189,6 +224,8 @@ pub static BOOK_DATA: Lazy<BookData> = Lazy::new(|| {
         titles,
         sentences,
         blog_textures: blog_textures.into_iter().collect(),
+        blog_motifs: blog_motifs.into_iter().collect(),
+        blog_verbs: blog_verbs.into_iter().collect(),
     }
 });
 

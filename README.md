@@ -27,11 +27,25 @@ cards; their links do not identify a stored post.
 
 Blog posts use four seeded formats (reading notes, field diaries, personal
 essays, and observations). Each article follows one premise through varied
-sections and roughly 350–900 words of original procedural prose. Public-domain
-books supply only a small filtered vocabulary of individual words, not sentences
-or passages. Homepage and collection previews come from the linked article;
-the selection refreshes while each destination remains stable. The blog
-generator intentionally changes the content of older blog URLs.
+sections and roughly 350–900 words of original procedural prose. The five
+public-domain books supply a filtered vocabulary of individual words, not
+sentences or quotations. Some articles include an extra paragraph composed
+from that vocabulary and their existing premise; a smaller share are entirely
+composed in this book-influenced style. The legacy RSS feed is not used for
+blog prose. Homepage and collection previews come from the linked article;
+the selection refreshes while each destination remains
+stable. The blog generator draws from 18 curated premises per format, 16 title
+patterns per format, and multiple format-specific developments, reflections,
+and endings.
+This expansion intentionally changes the content of older blog URLs.
+
+Social profiles now draw from 18 topical personas, each with distinct bios, six
+written posts, and eight additional observations combined with several openings
+and persona-specific reactions. A profile avoids repeating even a differently
+worded version of the same observation within its ten-post window. Shared
+everyday posts and conversational replies add variety; paper mentions have 30
+post shapes. A profile's persona and posts remain repeatable for its username,
+while the feed remains fresh on each visit.
 
 ## Local development
 
@@ -45,10 +59,10 @@ The default listener is `0.0.0.0:43796`; set `SINKLAND_BIND=127.0.0.1:43796` to
 listen only on loopback. This setting accepts an IP address and port, not a hostname.
 
 The first build downloads books from Project Gutenberg, a haiku dataset, and a
-legacy blog RSS feed into `assets/`. The feed does not contribute vocabulary to
-procedural blog posts. Run the executable from a directory containing `assets/`,
-`templates/`, and `static/`. An optional `.env` file can set `SINKLAND_FRIENDS` to a
-JSON array of URLs.
+legacy blog RSS feed into `assets/`. The feed does not contribute vocabulary or
+passages to procedural blog posts. Run the executable from a directory
+containing `assets/`, `templates/`, and `static/`. An optional `.env` file can set
+`SINKLAND_FRIENDS` to a JSON array of URLs.
 
 ## Synthetic academic papers
 
@@ -89,10 +103,12 @@ short papers are not biased toward the first few types. Each paper uses only its
 generated **2–10 figure subset**; because there are twelve families, no paper
 contains every family and a family is not repeated within one paper. Figure/table captions,
 experiment contexts, units, and 3–5 configuration names are generated from each
-paper's stable identity rather than repeated global baseline labels. New `v2`
-papers draw from field-specific method names, sometimes varying a technique or
-including a topic-specific configuration, instead of giving every result the
-same adjective-and-noun pattern. Tables
+paper's stable identity rather than repeated global baseline labels. New `v2` papers draw from field-specific method names, sometimes varying a
+technique or including a topic-specific configuration, instead of giving every
+result the same adjective-and-noun pattern. Their titles and measurement labels
+are grounded in the topic and synthetic evaluation setting. Each of the 48
+curated subjects now has its own premise, study-design framing, and
+interpretation boundary. Tables
 come from each experiment section, without a separate table-count cap (a
 ten-experiment paper has twenty tables). Tables, numeric statements, and charts
 all derive from the same observations. The uncertainty bars use the documented
@@ -108,59 +124,26 @@ Even two-figure papers have at least 650 words of prose, with longer papers
 growing through their results rather than generic filler. Numbered headings,
 in-page contents links, responsive measure, and print styling help navigation.
 
-Titles use fourteen structural forms and short category-conditioned phrases from
-the compiled transition model rather than a single repeated prefix. Blog related
+Titles use fourteen forms based on the paper's own subject and first evaluation
+setting. Blog related
 links and occasional social posts also point to canonical papers within the
 archive. Paper mentions are limited to a stable roughly one-in-eight subset of
 fictional profiles; around one in five posts by those profiles mentions a paper
 (about 2.5% of social posts overall). Their text varies by topic, author,
 category, and phrasing rather than following two fixed post patterns.
 
-### Build-time paper corpus
+### Paper identities and build
 
-Building now also requires **Python 3**. `build.rs` invokes
-`scripts/prepare-paper-corpus.py` to prepare a small, version-pinned selection of
-original-English public-domain scientific books from
-`corpus/papers/manifest.json`. The current set uses Project Gutenberg plain-text
-editions across computing history, mathematics, physics, statistics, biology,
-finance, economics, and electrical engineering. Every selected ebook is marked
-non-copyrighted by Project Gutenberg, and every author died by 1946—inside the
-manifest's conservative pre-1956 review cutoff.
-
-The first build fetches missing inputs sequentially with conservative pacing.
-Cleaned text is cached under `target/sinkland-paper-corpus/` and verified against
-reviewed SHA-256 checksums before use. A warm cache permits offline paper-corpus
-preparation; the existing books/haikus must also be present for an entirely
-offline build. Extraction removes Project Gutenberg headers, license boilerplate,
-short headings, and other non-paragraph fragments before normalization. To avoid
-embedding entire books, it deterministically samples about 25,000 words across
-each work rather than taking only its opening chapters.
-
-Rust compiles sorted, category-specific word-transition maps into `OUT_DIR`.
-The executable uses short, filtered phrases from these maps in titles; the
-paper body instead describes its own generated observations. The executable
-embeds the model, **not the source books or their metadata**. Raw source text
-is not included in release archives, and there is
-no public corpus-credit route in the application. The Pi needs no model downloads,
-Project Gutenberg access, Python, plotting service, or writable runtime cache to
-serve papers. Existing book/haiku packaging is unchanged.
-
-To update the corpus, independently verify the work, edition, original language,
-Project Gutenberg rights metadata, author death year, and stable plain-text URL.
-Review the stripped prose and deliberately update its SHA-256 checksum; do not
-simply accept a changed checksum after a download failure. The extractor rejects
-non-public-domain status, translated works, and authors outside the reviewed
-death-year cutoff. Require at least two reviewed sources per category; missing
-coverage or corrupt inputs fail the build. The supported broad categories are
-`cs`, `math`, `physics`, `stat`, `q-bio`, `q-fin`, `econ`, and `eess`.
-
-The `v1` identity namespace covers both generator logic and corpus semantics.
-Existing `v1` URLs retain their original configurations and abstracts. New
-discoveries and their references and cross-section links use `v2` identities
-for the revised abstracts and result names; `v1` papers continue to reference `v1`
-papers. Content-breaking changes require another namespace and an explicit
-old-URL compatibility decision. Live footer counters are not part of the
-deterministic paper content. Keep dependency versions locked for reproducibility.
+Paper pages, discovery results, references, figures, and citations use `v2`
+identities exclusively. Retired `v1` paper, citation, and figure URLs return 404;
+they are not redirected. Titles, prose, and figures are generated from curated
+subject-specific phrases and synthetic observations. The old build-time paper
+corpus and embedded transition model are no longer needed. Building the paper
+archive requires no Python, paper-corpus downloads, or separate model cache;
+the site's existing book and haiku assets are still required for other sections.
+The supported categories are `cs`, `math`, `physics`, `stat`, `q-bio`, `q-fin`,
+`econ`, and `eess`. Live footer counters are not part of deterministic paper
+content. Keep dependency versions locked for reproducibility.
 
 ### Development checks
 

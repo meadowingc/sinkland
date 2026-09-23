@@ -2,13 +2,7 @@ use parquet::file::reader::{FileReader, SerializedFileReader};
 use std::fs;
 use std::path::Path;
 
-#[path = "build_support/paper_corpus.rs"]
-mod paper_corpus;
-
 fn main() {
-    paper_corpus::compile(Path::new(
-        &std::env::var("OUT_DIR").expect("OUT_DIR is set by Cargo"),
-    ));
     // Create .env file template if it doesn't exist
     let env_file = ".env";
     if !Path::new(env_file).exists() {

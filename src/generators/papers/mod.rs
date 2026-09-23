@@ -1,13 +1,13 @@
 pub mod charts;
-pub mod model;
 
-use once_cell::sync::Lazy;
 use rand::{Rng, SeedableRng, seq::SliceRandom};
 use rand_chacha::ChaCha8Rng;
 use serde::Serialize;
 use std::{collections::BTreeSet, fmt, str::FromStr};
 
-use model::{CATEGORIES, TextModel};
+pub const CATEGORIES: [&str; 8] = [
+    "cs", "math", "physics", "stat", "q-bio", "q-fin", "econ", "eess",
+];
 
 fn fingerprint(text: &str) -> u64 {
     text.bytes().fold(5381_u64, |hash, byte| {
@@ -17,20 +17,6 @@ fn fingerprint(text: &str) -> u64 {
 
 pub const ARCHIVE_NAME: &str = "Sinkland Research Archive";
 
-pub static MODEL: Lazy<TextModel> = Lazy::new(|| {
-    let model: TextModel = serde_json::from_slice(include_bytes!(concat!(
-        env!("OUT_DIR"),
-        "/paper-model.json"
-    )))
-    .expect("Compiled paper text model is invalid");
-    assert_eq!(model.revision, "v1");
-    assert!(
-        CATEGORIES
-            .iter()
-            .all(|category| model.categories.contains_key(*category))
-    );
-    model
-});
 pub fn category_name(category: &str) -> &'static str {
     match category {
         "cs" => "Computer science",
@@ -112,9 +98,273 @@ const TOPICS: [[&str; 6]; 8] = [
     ],
 ];
 
+struct TopicFrame {
+    premise: &'static str,
+    protocol: &'static str,
+    reading: &'static str,
+}
+
+const TOPIC_FRAMES: [[TopicFrame; 6]; 8] = [
+    [
+        TopicFrame {
+            premise: "Delayed acknowledgments can change how replicated services appear to converge.",
+            protocol: "Treat each configuration as a simulated replication policy and compare its response over equal-length observation windows.",
+            reading: "A difference between policies may reflect the imposed delay pattern rather than a general advantage in fault tolerance.",
+        },
+        TopicFrame {
+            premise: "A learner tuned to one feature distribution may respond differently after the input mix changes.",
+            protocol: "Represent the alternatives as training procedures evaluated on separate synthetic response sequences of equal length.",
+            reading: "Variation in response does not establish accuracy on an external test set or robustness to a particular shift.",
+        },
+        TopicFrame {
+            premise: "The ordering of nearly sorted inputs can affect the apparent cost of an adaptive sort.",
+            protocol: "Compare labeled sorting strategies on simulated sequences of equal length while varying the evaluation setting.",
+            reading: "The response summaries do not amount to a complexity bound or a benchmark on measured runtimes.",
+        },
+        TopicFrame {
+            premise: "Repeated inference steps can accumulate approximation error even when a single update is stable.",
+            protocol: "Use simulated update sequences to contrast alternative recursion schemes under the same observation count.",
+            reading: "A stable response in these sequences does not prove convergence for an arbitrary recursion.",
+        },
+        TopicFrame {
+            premise: "Communication delays can separate local agreement from network-wide consensus.",
+            protocol: "Interpret configurations as consensus policies and inspect their simulated responses within each communication setting.",
+            reading: "A response gap cannot by itself establish agreement guarantees under adversarial failures.",
+        },
+        TopicFrame {
+            premise: "Practical performance can change with instance structure despite a fixed asymptotic classification.",
+            protocol: "Compare abstract solver configurations on synthetic instance sequences without treating the response as elapsed time.",
+            reading: "The observed ordering is not a lower bound, a runtime theorem, or evidence about a specific implementation.",
+        },
+    ],
+    [
+        TopicFrame {
+            premise: "Local connectivity and global component structure need not vary together in random graph ensembles.",
+            protocol: "Use equal-length synthetic graph-statistic sequences to compare alternative ensemble summaries.",
+            reading: "The comparison concerns sampled response profiles, not a threshold theorem for graph connectivity.",
+        },
+        TopicFrame {
+            premise: "Boundary conditions can alter which eigenmodes dominate a geometric construction.",
+            protocol: "View each configuration as a spectral approximation evaluated on separate simulated observation sequences.",
+            reading: "Separation in the response summaries does not identify an exact spectrum or establish geometric isospectrality.",
+        },
+        TopicFrame {
+            premise: "Finite-dimensional projections can obscure behavior in an infinite-dimensional space.",
+            protocol: "Compare projected operator summaries over generated sequences with the same within-setting sample size.",
+            reading: "Finite sequences do not justify a claim of convergence in operator norm.",
+        },
+        TopicFrame {
+            premise: "Small changes in a filtration can shift which persistent features remain visible.",
+            protocol: "Treat the configurations as alternative filtration summaries on simulated observations.",
+            reading: "The response contrast is not evidence that two spaces have different topological types.",
+        },
+        TopicFrame {
+            premise: "Long-run trajectories can differ even when short-step dynamics appear similar.",
+            protocol: "Compare abstract trajectory summaries over equal-length generated observation sequences.",
+            reading: "These descriptive windows cannot establish ergodicity or the existence of an attractor.",
+        },
+        TopicFrame {
+            premise: "A constraint active at one boundary may be irrelevant in the interior of a feasible region.",
+            protocol: "Use synthetic constraint-response sequences to compare alternative geometric approximations.",
+            reading: "Observed spread does not certify feasibility or an optimal solution to a particular program.",
+        },
+    ],
+    [
+        TopicFrame {
+            premise: "Fluctuation summaries can depend on how strongly nearby modes are coupled.",
+            protocol: "Compare simulated mode-response configurations within each generated observation setting.",
+            reading: "The numerical contrast is not a measurement of a quantum state or a test of a field theory.",
+        },
+        TopicFrame {
+            premise: "A flow may exhibit different dispersion across regions with different mixing conditions.",
+            protocol: "Model alternative flow summaries as synthetic response series sampled over equal-length windows.",
+            reading: "These series cannot resolve an energy cascade or substitute for measured velocity fields.",
+        },
+        TopicFrame {
+            premise: "Interaction strength and observation scale can jointly shape an ensemble response.",
+            protocol: "Compare simulated interaction configurations using the same sequence length within a setting.",
+            reading: "The ordering does not identify a particle species or determine a scattering cross section.",
+        },
+        TopicFrame {
+            premise: "A small disturbance can produce different responses under different background conditions.",
+            protocol: "Represent perturbation schemes as labeled synthetic series rather than measured gravitational signals.",
+            reading: "Descriptive differences are not evidence of a source or a gravitational-wave detection.",
+        },
+        TopicFrame {
+            premise: "Near a transition boundary, response variability can be as informative as its average.",
+            protocol: "Contrast simulated state summaries across separately generated evaluation settings.",
+            reading: "A response shift alone cannot locate a critical point or determine a universality class.",
+        },
+        TopicFrame {
+            premise: "The approach to a steady state can depend on the initial distribution of energy.",
+            protocol: "Compare abstract equilibration configurations over separate synthetic observation windows of equal length.",
+            reading: "A flat or narrow response profile does not demonstrate thermodynamic equilibrium.",
+        },
+    ],
+    [
+        TopicFrame {
+            premise: "Posterior summaries can change when prior concentration and sample size interact.",
+            protocol: "Compare labeled inference configurations on equally sized generated response sequences.",
+            reading: "The descriptive intervals here are not posterior credible intervals.",
+        },
+        TopicFrame {
+            premise: "Confounding can persist after adjustment if relevant covariates remain unobserved.",
+            protocol: "Use simulated estimator-response series to contrast adjustment configurations without assigning treatment.",
+            reading: "A difference in the summaries is not an identified causal effect.",
+        },
+        TopicFrame {
+            premise: "A model can retain its ranking while its reported probabilities drift out of calibration.",
+            protocol: "Compare abstract calibration configurations on synthetic observation sequences of equal length.",
+            reading: "The response index is not an observed calibration error or a coverage guarantee.",
+        },
+        TopicFrame {
+            premise: "The pattern of missingness matters when incomplete records are summarized.",
+            protocol: "Treat configurations as alternative missing-data summaries evaluated on generated response sequences.",
+            reading: "No missingness mechanism is identified from these synthetic summaries alone.",
+        },
+        TopicFrame {
+            premise: "An estimate can appear stable in one draw yet vary substantially across repeated samples.",
+            protocol: "Compare sampling configurations using equal within-setting sequence lengths.",
+            reading: "Illustrative mean intervals should not be read as calibrated coverage probabilities.",
+        },
+        TopicFrame {
+            premise: "Dependence between repeated measurements can reduce the information in a long sequence.",
+            protocol: "Compare labeled correlation summaries on separately generated observation windows.",
+            reading: "The sample SD does not adjust the mean interval for serial dependence.",
+        },
+    ],
+    [
+        TopicFrame {
+            premise: "Population response can change when density and resource availability vary together.",
+            protocol: "Treat configurations as population summaries observed over separate synthetic sequences of equal length.",
+            reading: "The response profile does not estimate a real carrying capacity or growth rate.",
+        },
+        TopicFrame {
+            premise: "Local interactions may produce group patterns that are not visible in individual summaries.",
+            protocol: "Compare simulated collective-response configurations across equal-length observation windows.",
+            reading: "A change in the index cannot establish a behavioral mechanism in an observed population.",
+        },
+        TopicFrame {
+            premise: "Timing cues can alter the phase of a biological rhythm without changing its period.",
+            protocol: "Use synthetic rhythm-response sequences to compare alternative regulation summaries.",
+            reading: "The generated values are not gene-expression measurements or a phase-shift estimate.",
+        },
+        TopicFrame {
+            premise: "Community composition may respond differently to a disturbance across sampling contexts.",
+            protocol: "Compare labeled microbial-community summaries over generated observation sequences.",
+            reading: "The response index is not a species abundance or a diversity estimate from sequencing.",
+        },
+        TopicFrame {
+            premise: "Interactions among species can change the apparent stability of an ecological network.",
+            protocol: "Treat configurations as alternative network summaries evaluated over separate simulated sequences.",
+            reading: "Differences in the index do not establish a food-web link or a real extinction risk.",
+        },
+        TopicFrame {
+            premise: "Selection and drift can leave different signatures across successive generations.",
+            protocol: "Compare abstract adaptation summaries on generated sequences with equal within-setting lengths.",
+            reading: "The observations cannot identify a selected locus or an evolutionary rate.",
+        },
+    ],
+    [
+        TopicFrame {
+            premise: "A portfolio's response can change when asset correlations shift together.",
+            protocol: "Compare labeled allocation rules on synthetic response sequences with equal observation counts.",
+            reading: "These values are not realized returns and do not establish a tradable advantage.",
+        },
+        TopicFrame {
+            premise: "Volatility estimates can diverge when the observation window includes changing regimes.",
+            protocol: "Treat configurations as volatility-summary procedures applied to generated response windows.",
+            reading: "The index is not an annualized volatility estimate from market prices.",
+        },
+        TopicFrame {
+            premise: "An apparent pricing premium may depend on which risk factors are included.",
+            protocol: "Compare synthetic factor-response configurations within separately generated settings.",
+            reading: "A response difference is not a priced factor or an estimate of expected return.",
+        },
+        TopicFrame {
+            premise: "A liquid position in calm conditions can become costly to unwind under stress.",
+            protocol: "Compare abstract liquidity-reserve configurations on separate simulated sequences of equal length.",
+            reading: "The summaries do not quantify bid-ask spreads or available market depth.",
+        },
+        TopicFrame {
+            premise: "Diversification may weaken when exposures become more correlated in a stress regime.",
+            protocol: "Treat configurations as alternative exposure summaries across generated observation windows.",
+            reading: "The ordering does not imply lower realized tail loss in an actual portfolio.",
+        },
+        TopicFrame {
+            premise: "A seasonal pattern can disappear when the composition of observed assets changes.",
+            protocol: "Compare labeled seasonal-factor summaries on synthetic within-setting sequences.",
+            reading: "The resulting contrast is not evidence of an exploitable calendar premium.",
+        },
+    ],
+    [
+        TopicFrame {
+            premise: "An allocation rule can favor one group when resource constraints bind.",
+            protocol: "Compare synthetic allocation-response configurations on equally sized observation windows.",
+            reading: "A response gap does not measure welfare or establish an optimal policy.",
+        },
+        TopicFrame {
+            premise: "Strategic behavior can change when agents observe different parts of the same game.",
+            protocol: "Treat configurations as alternative coordination summaries evaluated on generated sequences.",
+            reading: "The ordering does not prove that a particular equilibrium is selected.",
+        },
+        TopicFrame {
+            premise: "Infrastructure benefits can be uneven when access differs across locations.",
+            protocol: "Compare abstract infrastructure-response configurations under separately generated settings.",
+            reading: "The index does not measure a real project's benefits or distributional incidence.",
+        },
+        TopicFrame {
+            premise: "Waiting costs can accumulate differently when service capacity changes.",
+            protocol: "Compare labeled queue-response rules over separate synthetic observation windows of equal length.",
+            reading: "The reported values are not observed wait times or estimates of consumer surplus.",
+        },
+        TopicFrame {
+            premise: "Unequal access to information can change which transactions take place.",
+            protocol: "Treat configurations as information-response summaries on generated observation sequences.",
+            reading: "The contrast cannot identify adverse selection in an actual market.",
+        },
+        TopicFrame {
+            premise: "An equilibrium response may shift when supply constraints and demand change together.",
+            protocol: "Compare abstract market configurations on equal-length synthetic sequences.",
+            reading: "The response index cannot identify a market-clearing price or welfare effect.",
+        },
+    ],
+    [
+        TopicFrame {
+            premise: "Reconstruction quality can vary when portions of a signal are absent.",
+            protocol: "Compare labeled reconstruction procedures on generated response sequences of equal length.",
+            reading: "The index is not a measured signal-to-noise ratio or reconstruction error.",
+        },
+        TopicFrame {
+            premise: "Controller response can change when feedback arrives after a delay.",
+            protocol: "Treat configurations as feedback policies evaluated over equal-length synthetic observation windows.",
+            reading: "A narrow response distribution is not a closed-loop stability proof.",
+        },
+        TopicFrame {
+            premise: "Weak signals can be difficult to distinguish from structured background noise.",
+            protocol: "Compare alternative estimation summaries over generated observation windows.",
+            reading: "The synthetic response is not an instrument-level detection limit.",
+        },
+        TopicFrame {
+            premise: "Navigation estimates can drift when landmarks are intermittently unavailable.",
+            protocol: "Compare labeled navigation configurations on synthetic sequences with the same sample count.",
+            reading: "The response index does not quantify physical localization error.",
+        },
+        TopicFrame {
+            premise: "Uneven sensor coverage can change the benefit of combining measurements.",
+            protocol: "Compare abstract sensor-fusion summaries over equally sampled generated settings.",
+            reading: "These values are not sensor readings or evidence of field deployment performance.",
+        },
+        TopicFrame {
+            premise: "Phase offsets can accumulate when oscillators exchange imperfect timing signals.",
+            protocol: "Treat configurations as synchronization summaries on generated response sequences.",
+            reading: "The contrast does not demonstrate phase lock in a physical oscillator network.",
+        },
+    ],
+];
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PaperId {
-    pub revision: u8,
     pub category: usize,
     pub author: u32,
     pub topic: usize,
@@ -125,8 +375,8 @@ impl fmt::Display for PaperId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "v{}.{}.{:08x}.{}.{:016x}",
-            self.revision, CATEGORIES[self.category], self.author, self.topic, self.nonce
+            "v2.{}.{:08x}.{}.{:016x}",
+            CATEGORIES[self.category], self.author, self.topic, self.nonce
         )
     }
 }
@@ -138,7 +388,7 @@ impl FromStr for PaperId {
             return Err("Paper ID too long");
         }
         let parts: Vec<_> = value.split('.').collect();
-        if parts.len() != 5 || !["v1", "v2"].contains(&parts[0]) {
+        if parts.len() != 5 || parts[0] != "v2" {
             return Err("Invalid paper revision or ID");
         }
         let category = CATEGORIES
@@ -146,7 +396,6 @@ impl FromStr for PaperId {
             .position(|category| *category == parts[1])
             .ok_or("Unknown category")?;
         let id = Self {
-            revision: parts[0][1..].parse().map_err(|_| "Invalid revision")?,
             category,
             author: u32::from_str_radix(parts[2], 16).map_err(|_| "Invalid author ID")?,
             topic: parts[3].parse().map_err(|_| "Invalid topic")?,
@@ -278,7 +527,6 @@ pub struct Metadata {
 pub fn metadata(id: &PaperId) -> Metadata {
     let mut rng = rng(&format!("{id}:metadata"));
     let topic = TOPICS[id.category][id.topic];
-    let learned_phrase = academic_phrase(id.category, &mut rng);
     let qualifiers = [
         "under distribution shift",
         "with incomplete observations",
@@ -290,21 +538,23 @@ pub fn metadata(id: &PaperId) -> Metadata {
         "across multiple operating conditions",
     ];
     let qualifier = qualifiers.choose(&mut rng).unwrap();
-    let title = match rng.gen_range(0..14) {
-        0 => format!("A comparative analysis of {topic} {qualifier}"),
-        1 => format!("{topic}: {learned_phrase}"),
-        2 => format!("On the stability of {topic} {qualifier}"),
-        3 => format!("Estimating {topic}: {learned_phrase}"),
-        4 => format!("When does {topic} generalize? {learned_phrase}"),
-        5 => format!("Characterizing {topic} {qualifier}"),
-        6 => format!("Learning representations for {topic}: {learned_phrase}"),
-        7 => format!("The structure of {topic}: {learned_phrase}"),
-        8 => format!("Robust inference for {topic} {qualifier}"),
-        9 => format!("Revisiting {topic}: {learned_phrase}"),
-        10 => format!("Scaling laws for {topic} {qualifier}"),
-        11 => format!("An empirical account of {topic}: {learned_phrase}"),
-        12 => format!("Towards a unified account of {topic} {qualifier}"),
-        _ => format!("{topic} beyond standard assumptions: {learned_phrase}"),
+    let mut title_rng = self::rng(&format!("{id}:title-v2"));
+    let setting = experiment(id, 0).context;
+    let title = match title_rng.gen_range(0..14) {
+        0 => format!("A descriptive comparison of {topic} {qualifier}: {setting}"),
+        1 => format!("{topic}: {setting} {qualifier}"),
+        2 => format!("Response variation in {topic} {qualifier}: {setting}"),
+        3 => format!("Configuration-level responses in {topic}: {setting}"),
+        4 => format!("Sensitivity of {topic} to evaluation setting: {setting}"),
+        5 => format!("Characterizing {topic} {qualifier}: {setting}"),
+        6 => format!("{topic} across synthetic observation windows: {setting}"),
+        7 => format!("The structure of {topic}: {setting} {qualifier}"),
+        8 => format!("Descriptive assessment of {topic} {qualifier}: {setting}"),
+        9 => format!("Revisiting {topic}: {setting} {qualifier}"),
+        10 => format!("Within-setting comparisons of {topic} {qualifier}: {setting}"),
+        11 => format!("A simulated account of {topic}: {setting}"),
+        12 => format!("Towards a comparative account of {topic} {qualifier}: {setting}"),
+        _ => format!("{topic} beyond a single summary: {setting} {qualifier}"),
     };
     Metadata {
         id: id.to_string(),
@@ -317,72 +567,6 @@ pub fn metadata(id: &PaperId) -> Metadata {
     }
 }
 
-fn academic_phrase(category: usize, rng: &mut impl Rng) -> String {
-    let model = &MODEL.categories[CATEGORIES[category]];
-    let connectors = [
-        "a", "an", "and", "are", "as", "at", "by", "for", "from", "in", "is", "of", "on", "or",
-        "that", "the", "their", "these", "this", "to", "was", "were", "which", "with",
-    ];
-    let unsuitable = [
-        "it",
-        "we",
-        "our",
-        "this",
-        "paper",
-        "article",
-        "section",
-        "figure",
-        "table",
-        "appendix",
-        "here",
-        "show",
-        "shows",
-        "shown",
-        "present",
-        "presented",
-        "propose",
-        "proposed",
-        "introduce",
-        "introduced",
-        "conclude",
-        "discussion",
-        "results",
-    ];
-    for _ in 0..48 {
-        let mut tokens = model::words(model.starts.choose(rng).expect("Validated starts"));
-        let target = rng.gen_range(4..=7);
-        while tokens.len() < target {
-            let key = tokens[tokens.len() - 2..].join(" ");
-            let Some(options) = model.transitions.get(&key) else {
-                break;
-            };
-            let total: u64 = options.iter().map(|(_, count)| *count as u64).sum();
-            let mut choice = rng.gen_range(0..total);
-            let mut next = None;
-            for (word, weight) in options {
-                if choice < *weight as u64 {
-                    next = Some(word.clone());
-                    break;
-                }
-                choice -= *weight as u64;
-            }
-            let Some(next) = next else { break };
-            tokens.push(next);
-        }
-        tokens.truncate(target);
-        if tokens.len() >= 4
-            && !connectors.contains(&tokens[0].as_str())
-            && !connectors.contains(&tokens.last().unwrap().as_str())
-            && tokens
-                .iter()
-                .all(|word| !unsuitable.contains(&word.as_str()))
-        {
-            return capitalize_title(&tokens.join(" "));
-        }
-    }
-    "Structured Comparative Evidence".to_owned()
-}
-
 fn capitalize_title(value: &str) -> String {
     let mut chars = value.chars();
     match chars.next() {
@@ -393,7 +577,6 @@ fn capitalize_title(value: &str) -> String {
 
 pub fn random_metadata(rng: &mut impl Rng) -> Metadata {
     metadata(&PaperId {
-        revision: 2,
         category: rng.gen_range(0..CATEGORIES.len()),
         author: rng.r#gen(),
         topic: rng.gen_range(0..6),
@@ -439,17 +622,6 @@ pub fn discover(
     page: u32,
     owner: Option<u32>,
 ) -> Vec<Metadata> {
-    discover_revision(query, category, seed, page, owner, 2)
-}
-
-fn discover_revision(
-    query: &str,
-    category: Option<usize>,
-    seed: u64,
-    page: u32,
-    owner: Option<u32>,
-    revision: u8,
-) -> Vec<Metadata> {
     let mut rng = rng(&format!(
         "discovery:{seed}:{page}:{query}:{category:?}:{owner:?}"
     ));
@@ -476,7 +648,6 @@ fn discover_revision(
                 )
             });
             metadata(&PaperId {
-                revision,
                 category: cat,
                 topic,
                 author: owner.unwrap_or_else(|| rng.r#gen()),
@@ -628,138 +799,129 @@ fn configuration_names(id: &PaperId) -> Vec<String> {
         "Coupled",
         "Stochastic",
     ];
-    if id.revision == 2 {
-        let methods = [
-            [
-                "Graph partitioning",
-                "Message passing",
-                "Event-driven sampling",
-                "Low-rank projection",
-                "Multistage scheduling",
-                "Kernel interpolation",
-                "Distributed averaging",
-                "Sparse coding",
-                "Constraint propagation",
-                "Sequential routing",
-            ],
-            [
-                "Spectral projection",
-                "Fixed-point iteration",
-                "Variational approximation",
-                "Kernel smoothing",
-                "Topological filtration",
-                "Random walk sampling",
-                "Convex relaxation",
-                "Geodesic interpolation",
-                "Graph rewiring",
-                "Operator splitting",
-            ],
-            [
-                "Spectral decomposition",
-                "Phase-space sampling",
-                "Lattice transport",
-                "Perturbative expansion",
-                "Mode coupling",
-                "Field reconstruction",
-                "Finite-volume discretization",
-                "Wavelet analysis",
-                "Particle filtering",
-                "Ensemble integration",
-            ],
-            [
-                "Bootstrap resampling",
-                "Partial pooling",
-                "Robust regression",
-                "Posterior prediction",
-                "Inverse weighting",
-                "Cross-validation",
-                "Shrinkage estimation",
-                "Spline smoothing",
-                "Quantile calibration",
-                "Hierarchical inference",
-            ],
-            [
-                "Longitudinal smoothing",
-                "Mixed-effects estimation",
-                "Network inference",
-                "Spatial clustering",
-                "Hierarchical aggregation",
-                "Sparse regression",
-                "Temporal alignment",
-                "Multiscale embedding",
-                "Population stratification",
-                "Trajectory reconstruction",
-            ],
-            [
-                "Factor decomposition",
-                "Volatility targeting",
-                "Rolling-window estimation",
-                "Risk parity",
-                "Regime switching",
-                "Liquidity adjustment",
-                "Tail-risk estimation",
-                "Portfolio rebalancing",
-                "Scenario weighting",
-                "Hedged exposure",
-            ],
-            [
-                "Instrumental variables",
-                "Difference-in-differences",
-                "Synthetic control",
-                "Panel regression",
-                "Spatial equilibrium",
-                "Cohort weighting",
-                "Event study",
-                "Counterfactual matching",
-                "Structural estimation",
-                "Distributional accounting",
-            ],
-            [
-                "Adaptive filtering",
-                "Kalman estimation",
-                "Model predictive control",
-                "Frequency-response analysis",
-                "Channel equalization",
-                "Sparse reconstruction",
-                "Sensor fusion",
-                "Feedback linearization",
-                "State-space identification",
-                "Waveform tracking",
-            ],
-        ][id.category];
-        let group_count = rng.gen_range(3..=5);
-        let mut names = methods
-            .choose_multiple(&mut rng, group_count)
-            .map(|method| {
-                if rng.gen_bool(0.35) {
-                    let method = if *method == "Kalman estimation" {
-                        (*method).to_owned()
-                    } else {
-                        method.to_lowercase()
-                    };
-                    format!(
-                        "{} {method}",
-                        ["Robust", "Joint", "Multiscale", "Two-stage"]
-                            .choose(&mut rng)
-                            .unwrap()
-                    )
-                } else {
-                    (*method).to_owned()
-                }
-            })
-            .collect::<Vec<_>>();
-        if rng.gen_bool(0.55) {
-            let index = rng.gen_range(0..names.len());
-            names[index] = format!("{} {subject}", prefixes.choose(&mut rng).unwrap());
-        }
-        names.shuffle(&mut rng);
-        return names;
-    }
+    let methods = [
+        [
+            "Graph partitioning",
+            "Message passing",
+            "Event-driven sampling",
+            "Low-rank projection",
+            "Multistage scheduling",
+            "Kernel interpolation",
+            "Distributed averaging",
+            "Sparse coding",
+            "Constraint propagation",
+            "Sequential routing",
+        ],
+        [
+            "Spectral projection",
+            "Fixed-point iteration",
+            "Variational approximation",
+            "Kernel smoothing",
+            "Topological filtration",
+            "Random walk sampling",
+            "Convex relaxation",
+            "Geodesic interpolation",
+            "Graph rewiring",
+            "Operator splitting",
+        ],
+        [
+            "Spectral decomposition",
+            "Phase-space sampling",
+            "Lattice transport",
+            "Perturbative expansion",
+            "Mode coupling",
+            "Field reconstruction",
+            "Finite-volume discretization",
+            "Wavelet analysis",
+            "Particle filtering",
+            "Ensemble integration",
+        ],
+        [
+            "Bootstrap resampling",
+            "Partial pooling",
+            "Robust regression",
+            "Posterior prediction",
+            "Inverse weighting",
+            "Cross-validation",
+            "Shrinkage estimation",
+            "Spline smoothing",
+            "Quantile calibration",
+            "Hierarchical inference",
+        ],
+        [
+            "Longitudinal smoothing",
+            "Mixed-effects estimation",
+            "Network inference",
+            "Spatial clustering",
+            "Hierarchical aggregation",
+            "Sparse regression",
+            "Temporal alignment",
+            "Multiscale embedding",
+            "Population stratification",
+            "Trajectory reconstruction",
+        ],
+        [
+            "Factor decomposition",
+            "Volatility targeting",
+            "Rolling-window estimation",
+            "Risk parity",
+            "Regime switching",
+            "Liquidity adjustment",
+            "Tail-risk estimation",
+            "Portfolio rebalancing",
+            "Scenario weighting",
+            "Hedged exposure",
+        ],
+        [
+            "Instrumental variables",
+            "Difference-in-differences",
+            "Synthetic control",
+            "Panel regression",
+            "Spatial equilibrium",
+            "Cohort weighting",
+            "Event study",
+            "Counterfactual matching",
+            "Structural estimation",
+            "Distributional accounting",
+        ],
+        [
+            "Adaptive filtering",
+            "Kalman estimation",
+            "Model predictive control",
+            "Frequency-response analysis",
+            "Channel equalization",
+            "Sparse reconstruction",
+            "Sensor fusion",
+            "Feedback linearization",
+            "State-space identification",
+            "Waveform tracking",
+        ],
+    ][id.category];
     let group_count = rng.gen_range(3..=5);
-    let mut names = prefixes
+    let mut names = methods
         .choose_multiple(&mut rng, group_count)
-        .map(|prefix| format!("{prefix} {subject}"))
+        .map(|method| {
+            if rng.gen_bool(0.35) {
+                let method = if *method == "Kalman estimation" {
+                    (*method).to_owned()
+                } else {
+                    method.to_lowercase()
+                };
+                format!(
+                    "{} {method}",
+                    ["Robust", "Joint", "Multiscale", "Two-stage"]
+                        .choose(&mut rng)
+                        .unwrap()
+                )
+            } else {
+                (*method).to_owned()
+            }
+        })
         .collect::<Vec<_>>();
+    if rng.gen_bool(0.55) {
+        let index = rng.gen_range(0..names.len());
+        names[index] = format!("{} {subject}", prefixes.choose(&mut rng).unwrap());
+    }
     names.shuffle(&mut rng);
     names
 }
@@ -800,19 +962,21 @@ pub fn experiment(id: &PaperId, index: usize) -> Experiment {
         "ablation study",
     ];
     let context = contexts.choose(&mut rng).unwrap().to_string();
-    let measures = [
-        "normalized response",
-        "estimated effect",
-        "relative efficiency",
-        "prediction score",
-        "stability index",
-        "aggregate intensity",
-        "scaled deviation",
-        "performance coefficient",
-    ];
+    let unit = [
+        "normalized response units",
+        "synthetic response index points",
+        "scaled response units",
+        "simulated response units",
+        "response coefficient units",
+        "aggregate response units",
+        "scaled deviation units",
+        "modeled intensity units",
+    ]
+    .choose(&mut rng)
+    .unwrap();
     Experiment {
         context,
-        unit: measures.choose(&mut rng).unwrap().to_string(),
+        unit: (*unit).to_owned(),
         series,
     }
 }
@@ -1152,30 +1316,30 @@ fn paper_abstract(
 ) -> String {
     let mut rng = rng(&format!("{id}:abstract-v2"));
     let topic = &metadata.topic;
+    let setting = &first.context;
+    let unit = &first.unit;
+    let configurations = first.series.len();
+    let observations = first.series[0].summary.n;
     let opening = match style {
         Archetype::Comparative => [
-            format!("Differences among configurations make {topic} difficult to characterize across changing conditions."),
-            format!("For {topic}, measured behavior can depend on how alternative configurations are evaluated."),
-            format!("This study examines how configurations of {topic} compare when observation conditions vary."),
+            format!("The {setting} compares {configurations} alternatives for {topic} over {observations} observations each."),
+            format!("For {topic}, the {setting} contrasts {configurations} simulated configurations."),
+            format!("We examine variation in {topic} first through the {setting}, recording {observations} steps per configuration."),
         ],
         Archetype::Methods => [
-            format!("We assess whether evaluation choices alter the measured behavior of {topic}."),
-            format!("A consistent comparison of {topic} calls for attention to both response and measurement variability."),
-            format!("To examine {topic} across operating conditions, we apply a common measurement protocol."),
+            format!("Evaluation of {topic} begins with {observations} simulated measurements per configuration in the {setting}."),
+            format!("The {setting} provides a within-setting comparison of {configurations} approaches to {topic}."),
+            format!("For {topic}, we start with the {setting} and an equal {observations}-step window for each configuration."),
         ],
         Archetype::Observational => [
-            format!("Evidence about {topic} depends on the setting observed and the distribution of its measurements."),
-            format!("This work characterizes variation in {topic} across distinct observation settings."),
-            format!("The distributional behavior of {topic} is examined under multiple operating conditions."),
+            format!("The {setting} gives an initial view of {topic} across {observations} steps per configuration."),
+            format!("To characterize {topic}, we first inspect the response distributions from the {setting}."),
+            format!("A first look at {topic} compares {configurations} configurations during the {setting}."),
         ],
     }
     .choose(&mut rng)
     .unwrap()
     .clone();
-    let setting = &first.context;
-    let unit = &first.unit;
-    let configurations = first.series.len();
-    let observations = first.series[0].summary.n;
     let design = [
         format!(
             "Across {count} settings, we compare {configurations} configurations; \
@@ -1236,59 +1400,16 @@ fn paper_abstract(
     .choose(&mut rng)
     .unwrap()
     .clone();
-    let interpretation = [
-        "These contrasts are descriptive and depend on the reported observation conditions.".to_owned(),
-        format!("The results show why both configuration choice and measurement spread matter when interpreting {topic}."),
-        format!("Taken together, the observations motivate closer attention to variability in {topic} across settings."),
-        "The resulting contrast describes setting-specific measurements rather than a universal ranking.".to_owned(),
-    ]
-    .choose(&mut rng)
-    .unwrap()
-    .clone();
-    format!("{opening} {design} {findings} {interpretation}")
-}
-
-fn abstract_for_revision(
-    id: &PaperId,
-    metadata: &Metadata,
-    style: Archetype,
-    count: usize,
-    first: &Experiment,
-    last: &Experiment,
-) -> String {
-    if id.revision == 1 {
-        return format!(
-            "We investigate {} across {count} evaluation settings using {} \
-             consistently named configurations. Each setting comprises {}–{} \
-             observations per configuration, with descriptive estimates of \
-             central tendency, dispersion, and quantiles. In the first setting, \
-             {} records a mean of {:.2} {} and sample SD {:.2}; the corresponding \
-             results for other configurations and settings appear in the tables \
-             and figures. Comparisons are descriptive and should be interpreted \
-             within their reported units and observation conditions.",
-            metadata.topic,
-            first.series.len(),
-            (0..count)
-                .map(|index| experiment(id, index).series[0].summary.n)
-                .min()
-                .unwrap(),
-            (0..count)
-                .map(|index| experiment(id, index).series[0].summary.n)
-                .max()
-                .unwrap(),
-            first.series[0].name,
-            first.series[0].summary.mean,
-            first.unit,
-            first.series[0].summary.sd
-        );
-    }
-    paper_abstract(id, metadata, style, count, first, last)
+    format!(
+        "{opening} {} {design} {findings} {}",
+        TOPIC_FRAMES[id.category][id.topic].premise, TOPIC_FRAMES[id.category][id.topic].reading
+    )
 }
 
 pub fn abstract_preview(metadata: &Metadata) -> Result<String, &'static str> {
     let id: PaperId = metadata.id.parse()?;
     let count = figure_count(&id);
-    let text = abstract_for_revision(
+    let text = paper_abstract(
         &id,
         metadata,
         archetype(&id),
@@ -1343,64 +1464,54 @@ pub fn generate(id: &PaperId) -> Paper {
         ),
     };
     let mut sections = Vec::new();
-    add_section(
-        &mut sections,
-        2,
-        opening,
-        vec![
-            format!(
-                "The behavior of {} remains difficult to characterize when observations vary \
+    let mut introduction = vec![
+        format!(
+            "The behavior of {} remains difficult to characterize when observations vary \
              between configurations and operating conditions. This paper examines {count} \
              evaluation settings, asking how measured response and dispersion change \
              across a fixed set of alternatives. Reporting both central tendencies and \
              the underlying ranges avoids treating one favorable measurement as a complete result.",
-                metadata.topic
-            ),
-            format!(
-                "The comparison includes {labels}. Their labels refer to alternative \
+            metadata.topic
+        ),
+        format!(
+            "The comparison includes {labels}. Their labels refer to alternative \
              configurations of the same modeled subject; each is observed on an equal \
              number of steps within a setting. The study emphasizes repeatable descriptive \
              summaries rather than claims of causal effects or universal performance.",
-            ),
-        ],
-        vec![],
-        None,
-    );
-    add_section(
-        &mut sections,
-        2,
-        setup,
-        vec![
-            format!(
-                "Each setting produces a sequence of {} to {} measurements per configuration. \
+        ),
+    ];
+    introduction.push(TOPIC_FRAMES[id.category][id.topic].premise.to_owned());
+    add_section(&mut sections, 2, opening, introduction, vec![], None);
+    let mut study_design = vec![
+        format!(
+            "Each setting produces a sequence of {} to {} measurements per configuration. \
              The first setting, {}, contains {} observations per configuration; \
              the final setting, {}, contains {}. Distinct settings use separately generated \
              observation sequences while preserving the configuration names throughout the paper.",
-                (0..count)
-                    .map(|index| experiment(id, index).series[0].summary.n)
-                    .min()
-                    .unwrap(),
-                (0..count)
-                    .map(|index| experiment(id, index).series[0].summary.n)
-                    .max()
-                    .unwrap(),
-                first.context,
-                first.series[0].summary.n,
-                last.context,
-                last.series[0].summary.n
-            ),
-            format!(
-                "For {} we record a value at each observation step and calculate \
+            (0..count)
+                .map(|index| experiment(id, index).series[0].summary.n)
+                .min()
+                .unwrap(),
+            (0..count)
+                .map(|index| experiment(id, index).series[0].summary.n)
+                .max()
+                .unwrap(),
+            first.context,
+            first.series[0].summary.n,
+            last.context,
+            last.series[0].summary.n
+        ),
+        format!(
+            "For {} we record a value at each observation step and calculate \
              the arithmetic mean, sample standard deviation, minimum, maximum, \
              and linearly interpolated quartiles. All tables and charts are rendered \
              from those same recorded values; a change in plotting style does not \
              change the underlying measurements.",
-                metadata.topic
-            ),
-        ],
-        vec![],
-        None,
-    );
+            metadata.topic
+        ),
+    ];
+    study_design.push(TOPIC_FRAMES[id.category][id.topic].protocol.to_owned());
+    add_section(&mut sections, 2, setup, study_design, vec![], None);
     add_section(
         &mut sections,
         2,
@@ -1537,37 +1648,32 @@ pub fn generate(id: &PaperId) -> Paper {
             Some(figure(id, index)),
         );
     }
-    add_section(
-        &mut sections,
-        2,
-        discussion,
-        vec![
-            format!(
-                "Across the reported settings, the analysis of {} shows why \
+    let mut interpretation = vec![
+        format!(
+            "Across the reported settings, the analysis of {} shows why \
              configuration-level comparisons require attention to both level and \
              variability. In the opening setting the mean for {} is {:.2} {}, \
              while the final setting reports {:.2} {} for the same configuration. \
              Because the units and observation contexts can differ, these two \
              numbers should not be subtracted to infer a cross-setting effect.",
-                metadata.topic,
-                first.series[0].name,
-                first.series[0].summary.mean,
-                first.unit,
-                last.series[0].summary.mean,
-                last.unit
-            ),
-            format!(
-                "The {} includes {} measurements per configuration; the {} includes {}. \
+            metadata.topic,
+            first.series[0].name,
+            first.series[0].summary.mean,
+            first.unit,
+            last.series[0].summary.mean,
+            last.unit
+        ),
+        format!(
+            "The {} includes {} measurements per configuration; the {} includes {}. \
              A higher or lower average within either setting describes that sample \
              only. Changes in the generating conditions, limited sample size, and \
              dependence between neighboring observations constrain any broader \
              interpretation of the figures and tabulated intervals.",
-                first.context, first.series[0].summary.n, last.context, last.series[0].summary.n
-            ),
-        ],
-        vec![],
-        None,
-    );
+            first.context, first.series[0].summary.n, last.context, last.series[0].summary.n
+        ),
+    ];
+    interpretation.push(TOPIC_FRAMES[id.category][id.topic].reading.to_owned());
+    add_section(&mut sections, 2, discussion, interpretation, vec![], None);
     if rng(&format!("{id}:limitations")).gen_bool(0.5) {
         add_section(
             &mut sections,
@@ -1615,7 +1721,6 @@ pub fn generate(id: &PaperId) -> Paper {
     let mut references = Vec::new();
     for _ in 0..8 {
         let target = PaperId {
-            revision: id.revision,
             category: id.category,
             author: ref_rng.r#gen(),
             topic: ref_rng.gen_range(0..6),
@@ -1625,19 +1730,18 @@ pub fn generate(id: &PaperId) -> Paper {
             references.push(self::metadata(&target));
         }
     }
-    let related = discover_revision(
+    let related = discover(
         "",
         Some(id.category),
         fingerprint(&format!("{id}:related")),
         0,
         None,
-        id.revision,
     )
     .into_iter()
     .take(4)
     .collect();
     Paper {
-        abstract_text: abstract_for_revision(id, &metadata, style, count, &first, &last),
+        abstract_text: paper_abstract(id, &metadata, style, count, &first, &last),
         metadata,
         sections,
         references,
@@ -1650,7 +1754,6 @@ mod tests {
     use super::*;
     fn id(nonce: u64) -> PaperId {
         PaperId {
-            revision: 2,
             category: 0,
             author: 12,
             topic: 3,
@@ -1659,67 +1762,16 @@ mod tests {
     }
 
     #[test]
-    fn revisioned_results_keep_legacy_papers_stable_and_vary_new_labels() {
-        let legacy: PaperId = "v1.cs.0000000c.3.000000000000000f".parse().unwrap();
-        let old = generate(&legacy);
-        assert!(
-            old.abstract_text
-                .starts_with("We investigate recursive inference")
-        );
-        assert!(
-            old.references
-                .iter()
-                .all(|entry| entry.id.starts_with("v1."))
-        );
-        assert!(old.related.iter().all(|entry| entry.id.starts_with("v1.")));
-        let old_names = configuration_names(&legacy);
-        assert_eq!(
-            old_names,
-            [
-                "Hierarchical replica",
-                "Sparse replica",
-                "Static replica",
-                "Dynamic replica",
-                "Constrained replica"
-            ]
-        );
-        assert_eq!(
-            experiment(&legacy, 0)
-                .series
-                .iter()
-                .map(|series| series.name.clone())
-                .collect::<Vec<_>>(),
-            old_names
-        );
-        assert_eq!(old.metadata.id, legacy.to_string());
-        assert_ne!(
-            old_names,
-            configuration_names(&PaperId {
-                revision: 2,
-                ..legacy.clone()
-            })
-        );
-
+    fn paper_configuration_labels_are_varied_and_consistent() {
         let mut labels = BTreeSet::new();
-        let mut total = 0;
-        let mut adjective_subject = 0;
         for category in 0..CATEGORIES.len() {
             for nonce in 0..20 {
                 let id = PaperId {
-                    revision: 2,
                     category,
                     author: 12,
                     topic: nonce % 6,
                     nonce: nonce as u64,
                 };
-                let old_subject = configuration_names(&PaperId {
-                    revision: 1,
-                    ..id.clone()
-                })[0]
-                    .split_whitespace()
-                    .last()
-                    .unwrap()
-                    .to_owned();
                 let names = configuration_names(&id);
                 assert!((3..=5).contains(&names.len()));
                 assert_eq!(names.iter().collect::<BTreeSet<_>>().len(), names.len());
@@ -1732,17 +1784,11 @@ mod tests {
                         .collect::<Vec<_>>()
                 );
                 for name in names {
-                    adjective_subject += usize::from(name.ends_with(&format!(" {old_subject}")));
-                    total += 1;
                     labels.insert(name);
                 }
             }
         }
         assert!(labels.len() > 100, "{} distinct labels", labels.len());
-        assert!(
-            adjective_subject * 4 < total,
-            "{adjective_subject}/{total} adjective-subject labels"
-        );
     }
 
     #[test]
@@ -1752,7 +1798,6 @@ mod tests {
         for category in 0..CATEGORIES.len() {
             for nonce in 0..8 {
                 let id = PaperId {
-                    revision: 2,
                     category,
                     author: 12,
                     topic: nonce % 6,
@@ -1787,22 +1832,153 @@ mod tests {
     }
 
     #[test]
+    fn topic_frames_cover_every_subject_and_keep_paper_surfaces_aligned() {
+        let mut premises = BTreeSet::new();
+        let mut protocols = BTreeSet::new();
+        let mut readings = BTreeSet::new();
+        for category in 0..CATEGORIES.len() {
+            for topic in 0..TOPICS[category].len() {
+                let frame = &TOPIC_FRAMES[category][topic];
+                assert!(premises.insert(frame.premise));
+                assert!(protocols.insert(frame.protocol));
+                assert!(readings.insert(frame.reading));
+                for nonce in [3, 19] {
+                    let id = PaperId {
+                        category,
+                        author: 12,
+                        topic,
+                        nonce,
+                    };
+                    let paper = generate(&id);
+                    assert!(
+                        paper
+                            .metadata
+                            .title
+                            .to_lowercase()
+                            .contains(&TOPICS[category][topic].to_lowercase()),
+                        "{id}: {}",
+                        paper.metadata.title
+                    );
+                    let first = experiment(&id, 0);
+                    assert!(
+                        paper.metadata.title.contains(&first.context),
+                        "{id}: {}",
+                        paper.metadata.title
+                    );
+                    assert!(!matches!(
+                        first.unit.as_str(),
+                        "estimated effect" | "relative efficiency" | "prediction score"
+                    ));
+                    assert!(paper.abstract_text.contains(frame.premise), "{id}");
+                    assert!(
+                        paper
+                            .abstract_text
+                            .split(". ")
+                            .next()
+                            .unwrap()
+                            .contains(&first.context),
+                        "{id}"
+                    );
+                    assert!(paper.abstract_text.ends_with(frame.reading), "{id}");
+                    assert!(
+                        paper.sections[0]
+                            .paragraphs
+                            .contains(&frame.premise.to_owned())
+                    );
+                    assert!(
+                        paper.sections[1]
+                            .paragraphs
+                            .contains(&frame.protocol.to_owned())
+                    );
+                    assert!(
+                        paper
+                            .sections
+                            .iter()
+                            .any(|section| section.paragraphs.contains(&frame.reading.to_owned()))
+                    );
+                    assert_eq!(paper, generate(&id));
+                    assert_eq!(
+                        abstract_preview(&paper.metadata).unwrap(),
+                        abstract_preview(&metadata(&id)).unwrap()
+                    );
+                    assert!(
+                        citation(&paper.metadata)
+                            .text
+                            .contains(&paper.metadata.title)
+                    );
+                }
+            }
+        }
+        assert_eq!(premises.len(), 48);
+        assert_eq!(protocols.len(), 48);
+        assert_eq!(readings.len(), 48);
+    }
+
+    #[test]
+    fn same_topic_abstract_openings_vary_across_paper_ids() {
+        for category in 0..CATEGORIES.len() {
+            for topic in 0..TOPICS[category].len() {
+                let mut openings = BTreeSet::new();
+                for nonce in 0..16 {
+                    let id = PaperId {
+                        category,
+                        topic,
+                        author: 12,
+                        nonce,
+                    };
+                    let metadata = metadata(&id);
+                    let preview = abstract_preview(&metadata).unwrap();
+                    let first_sentence = preview.split(". ").next().unwrap();
+                    assert!(
+                        first_sentence.contains(&experiment(&id, 0).context),
+                        "{id}: {first_sentence}"
+                    );
+                    let count = figure_count(&id);
+                    let abstract_text = paper_abstract(
+                        &id,
+                        &metadata,
+                        archetype(&id),
+                        count,
+                        &experiment(&id, 0),
+                        &experiment(&id, count - 1),
+                    );
+                    assert!(abstract_text.starts_with(first_sentence), "{id}");
+                    assert!(
+                        abstract_text.contains(TOPIC_FRAMES[category][topic].premise),
+                        "{id}: topic premise missing"
+                    );
+                    assert!(
+                        (60..=130).contains(&abstract_text.split_whitespace().count()),
+                        "{id}: abstract length out of bounds"
+                    );
+                    openings.insert(first_sentence.to_owned());
+                }
+                assert!(
+                    openings.len() >= 12,
+                    "{} / {}: only {} different first sentences across 16 papers",
+                    CATEGORIES[category],
+                    TOPICS[category][topic],
+                    openings.len()
+                );
+            }
+        }
+    }
+
+    #[test]
     fn identities_and_discoveries_are_consistent() {
         let original = id(15);
         assert_eq!(original.to_string().parse::<PaperId>().unwrap(), original);
         for bad in [
             "v3.cs.0000000c.3.000000000000000f",
+            "v1.cs.0000000c.3.000000000000000f",
             "v1.cs.c.3.f",
             "v1.cs.0000000c.9.000000000000000f",
             "<script>",
         ] {
             assert!(bad.parse::<PaperId>().is_err());
         }
-        let v1: PaperId = "v1.cs.0000000c.3.000000000000000f".parse().unwrap();
         let v2: PaperId = "v2.cs.0000000c.3.000000000000000f".parse().unwrap();
-        assert_eq!(v1.revision, 1);
-        assert_eq!(v2.revision, 2);
-        assert_ne!(v1, v2);
+        assert_eq!(v2.to_string(), "v2.cs.0000000c.3.000000000000000f");
         let results = discover("learning", None, 42, 0, Some(12));
         assert!(results.iter().all(|entry| entry.id.starts_with("v2.")));
         assert_eq!(results, discover("learning", None, 42, 0, Some(12)));
@@ -1870,7 +2046,6 @@ mod tests {
         let mut configurations = BTreeSet::new();
         for nonce in 0..100 {
             let id = PaperId {
-                revision: 2,
                 category: nonce as usize % CATEGORIES.len(),
                 author: 12,
                 topic: nonce as usize / CATEGORIES.len() % 6,
@@ -1939,7 +2114,6 @@ mod tests {
         let mut lengths_by_count = std::collections::BTreeMap::<usize, Vec<usize>>::new();
         for nonce in 0..144 {
             let id = PaperId {
-                revision: 2,
                 category: nonce as usize % CATEGORIES.len(),
                 author: 12,
                 topic: nonce as usize / CATEGORIES.len() % 6,
@@ -2035,13 +2209,12 @@ mod tests {
     }
 
     #[test]
-    fn titles_use_varied_forms_and_corpus_phrases() {
+    fn titles_use_varied_topic_grounded_forms() {
         let mut titles = BTreeSet::new();
         let mut openings = BTreeSet::new();
         let mut towards = 0;
         for nonce in 0..400 {
             let title = metadata(&PaperId {
-                revision: 2,
                 category: nonce as usize % CATEGORIES.len(),
                 author: 12,
                 topic: nonce as usize / CATEGORIES.len() % 6,

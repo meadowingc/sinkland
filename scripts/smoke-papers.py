@@ -40,9 +40,11 @@ def check(base):
     discovery, _ = fetch("/papers/search?q=inference&seed=000000000000002a")
     links = Page(discovery.decode()).links
     assert len(links) == 12
+    assert all(path.startswith("/papers/p/v2.") for path in links)
     for path in links[:2]:
         html, _ = fetch(path)
         page = Page(html.decode())
+        assert all(link.startswith("/papers/p/v2.") for link in page.links)
         assert 2 <= len(page.figures) <= 10
         assert html.count(b"<table>") == 2 * len(page.figures)
         assert page.headings.count("h3") == len(page.figures)
@@ -53,7 +55,7 @@ def check(base):
         bibtex, headers = fetch(path + "/citation.bib")
         assert headers.get_content_type() == "application/x-bibtex"
         assert bibtex.startswith(b"@misc{sinkland:")
-        assert b" and " in bibtex 
+        assert b" and " in bibtex
         for figure in page.figures:
             svg, headers = fetch(figure)
             assert headers.get_content_type() == "image/svg+xml"
@@ -61,14 +63,23 @@ def check(base):
             assert b"<script" not in svg and b"NaN" not in svg
     for path in ("/papers/category/cs", "/papers/author/0000000c", "/blog/check", "/haiku/check", "/social"):
         fetch(path)
-    for path in ("/papers/p/invalid", links[0] + "/figures/99", "/papers/sources", "/papers/corpus-credits"):
+    retired = "/papers/p/v1.cs.0000000c.3.000000000000000f"
+    for path in (
+        "/papers/p/invalid",
+        links[0] + "/figures/99",
+        retired,
+        retired + "/citation.bib",
+        retired + "/figures/0",
+        "/papers/sources",
+        "/papers/corpus-credits",
+    ):
         try:
             fetch(path)
         except urllib.error.HTTPError as error:
             assert error.code == 404
         else:
             raise AssertionError(f"Expected 404 for {path}")
-    print("Paper discovery, HTML, tables, SVGs and legacy endpoints passed.")
+    print("V2 discovery, HTML, tables, SVGs, and retired v1 endpoints passed.")
 
 
 if __name__ == "__main__":
