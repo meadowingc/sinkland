@@ -242,6 +242,7 @@ class QualitySamplerTests(unittest.TestCase):
         run.sample_papers = lambda: None
         run.sample_profiles = lambda rng: None
         run.sample_tags = lambda rng: None
+        run.check_books = lambda: len(sampler.BOOKS)
         with contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(run.run(), 1)
         self.assertIn("ADVISORY:", output.getvalue())
