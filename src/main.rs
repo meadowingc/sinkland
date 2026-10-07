@@ -51,11 +51,11 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
 // Section-specific visit counters
 
 // as of 2025-12-18
-static BLOG_VISITS: AtomicUsize = AtomicUsize::new(1854446);
-static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(18137);
-static POETRY_VISITS: AtomicUsize = AtomicUsize::new(0);
-static SOCIAL_VISITS: AtomicUsize = AtomicUsize::new(1259);
-static PAPER_VISITS: AtomicUsize = AtomicUsize::new(0);
+static BLOG_VISITS: AtomicUsize = AtomicUsize::new(1858815);
+static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(18444);
+static POETRY_VISITS: AtomicUsize = AtomicUsize::new(552);
+static SOCIAL_VISITS: AtomicUsize = AtomicUsize::new(6192);
+static PAPER_VISITS: AtomicUsize = AtomicUsize::new(1272458);
 
 /// Visit counts for all sections
 #[derive(Clone)]
