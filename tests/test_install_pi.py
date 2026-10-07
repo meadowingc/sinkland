@@ -173,6 +173,10 @@ class InstallerTests(unittest.TestCase):
             self.assertNotIn(TOKEN, unit)
             self.assertNotIn("MemoryMax", unit)
         self.assertIn("LoadCredential=tunnel-token:", (self.units / "sinkland-cloudflared.service").read_text())
+        self.assertIn(
+            "Environment=SINKLAND_TRUST_CLOUDFLARE=true",
+            (self.units / "sinkland.service").read_text(),
+        )
         self.assertFalse((self.units / "cloudflared.service").exists())
         self.assertIn(
             f"ExecStart={self.install_root}/bin/cloudflared ",
@@ -197,6 +201,23 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("ProtectHome=yes", unit)
         source.unlink()
         self.run_installer(extra_env={"HIDE_CLOUDFLARED": "1"})
+
+    def test_upgrade_preserves_rate_limit_overrides(self):
+        self.first_install()
+        settings = (
+            "SINKLAND_TRUST_CLOUDFLARE=false\n"
+            "SINKLAND_RATE_LIMIT_IP_RPS=3\n"
+            "SINKLAND_RATE_LIMIT_GLOBAL_RPS=8\n"
+            "SINKLAND_RATE_LIMIT_CONCURRENCY=2\n"
+        )
+        (self.config / "sinkland.env").write_text(settings)
+        self.make_release("v0.2.0")
+        self.run_installer()
+        self.assertEqual((self.config / "sinkland.env").read_text(), settings)
+        self.assertEqual((self.install_root / "current").resolve().name, "v0.2.0")
+        unit = (self.units / "sinkland.service").read_text()
+        self.assertIn("Environment=SINKLAND_TRUST_CLOUDFLARE=true", unit)
+        self.assertIn(f"EnvironmentFile={self.config}/sinkland.env", unit)
 
     def test_explicit_cloudflared_refreshes_service_copy(self):
         self.first_install()

@@ -5,7 +5,7 @@ use crate::{
     increment_paper_visits, insert_visit_counts,
 };
 use poem::{
-    Response, Route,
+    Request, Response, Route,
     error::{BadRequest, InternalServerError, NotFound},
     get, handler,
     http::StatusCode,
@@ -166,12 +166,19 @@ fn author(
 }
 
 #[handler]
-async fn paper(Path(paper_id): Path<String>) -> Result<Html<String>, poem::Error> {
+async fn paper(
+    request: &Request,
+    Path(paper_id): Path<String>,
+) -> Result<Html<String>, poem::Error> {
     let id: PaperId = paper_id.parse().map_err(not_found)?;
     let thread = ThreadKey::from_paper_id(&id);
-    let paper = tokio::task::spawn_blocking(move || generator::generate(&id))
-        .await
-        .map_err(server_error)?;
+    let permit = crate::rate_limit::WorkPermit::from_request(request);
+    let paper = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        generator::generate(&id)
+    })
+    .await
+    .map_err(server_error)?;
     let mut context = Context::new();
     context.insert("citation", &generator::citation(&paper.metadata));
     context.insert("paper", &paper);
@@ -196,7 +203,10 @@ fn bibtex(Path(paper_id): Path<String>) -> Result<Response, poem::Error> {
 }
 
 #[handler]
-async fn figure(Path((paper_id, index)): Path<(String, String)>) -> Result<Response, poem::Error> {
+async fn figure(
+    request: &Request,
+    Path((paper_id, index)): Path<(String, String)>,
+) -> Result<Response, poem::Error> {
     let id: PaperId = paper_id.parse().map_err(not_found)?;
     let index: usize = index
         .parse()
@@ -204,7 +214,9 @@ async fn figure(Path((paper_id, index)): Path<(String, String)>) -> Result<Respo
     if index >= generator::figure_count(&id) {
         return Err(not_found("Figure does not exist"));
     }
+    let permit = crate::rate_limit::WorkPermit::from_request(request);
     let svg = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
         generator::charts::render(
             &generator::experiment(&id, index),
             &generator::figure(&id, index),

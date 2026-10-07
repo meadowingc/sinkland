@@ -2,6 +2,7 @@ mod data;
 mod generators;
 mod papers;
 mod poetry;
+mod rate_limit;
 mod tags;
 
 use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA};
@@ -20,7 +21,7 @@ use generators::tags::{Tag, ThreadKey};
 use image::ImageFormat;
 use once_cell::sync::Lazy;
 use poem::{
-    Response, Route, Server,
+    EndpointExt, Response, Route, Server,
     endpoint::StaticFilesEndpoint,
     error::{BadRequest, InternalServerError},
     get, handler,
@@ -1022,7 +1023,7 @@ fn routes() -> Route {
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
     generators::poetry::validate_lexicon().map_err(std::io::Error::other)?;
-    let app = routes();
+    let app = routes().with(rate_limit::RateLimit::new(rate_limit::Config::from_env()?));
 
     let bind_address = match std::env::var("SINKLAND_BIND") {
         Ok(address) => address,

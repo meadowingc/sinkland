@@ -31,6 +31,8 @@ Requires 64-bit ARM Linux, systemd, and an already installed cloudflared.
   --help             Show this help.
 
 Existing hostname, token, and /etc/sinkland/sinkland.env are preserved on updates.
+The loopback-only service trusts Cloudflare's CF-Connecting-IP for rate limiting.
+Override SINKLAND_TRUST_CLOUDFLARE in sinkland.env if not using standard forwarding.
 The existing cloudflared.service, if any, is left alone.
 EOF
 }
@@ -131,6 +133,7 @@ WorkingDirectory=$INSTALL_ROOT/current
 ExecStart=$INSTALL_ROOT/current/sinkland
 EnvironmentFile=$CONFIG_DIR/sinkland.env
 Environment=SINKLAND_BIND=127.0.0.1:43796
+Environment=SINKLAND_TRUST_CLOUDFLARE=true
 Restart=on-failure
 RestartSec=5
 Nice=10
