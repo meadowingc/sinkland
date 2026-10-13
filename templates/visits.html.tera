@@ -1,0 +1,125 @@
+{% extends "base.html.tera" %}
+
+{% block title %}Visit History - Sinkland Archive{% endblock title %}
+
+{% block extra_styles %}
+    .content { max-width: 1100px; }
+    .stats-scroll { overflow-x: auto; margin: 24px 0; }
+    .stats-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    .stats-table caption { text-align: left; margin-bottom: 12px; }
+    .stats-table th, .stats-table td { padding: 10px; border-bottom: 1px solid #ddd; text-align: right; }
+    .stats-table th:first-child, .stats-table td:first-child { text-align: left; }
+    .stats-table thead { background: #edf2f5; }
+    .stats-warning { border-left: 4px solid #bb8620; background: #fff4d6; padding: 16px; }
+    .stats-summary { font-size: 1.15em; color: #586773; }
+    .stats-summary strong { font-size: 1.7em; color: #2c3e50; }
+    .stats-note { color: #586773; font-size: .9em; }
+    .stats-chart { border: 1px solid #dce2e5; border-radius: 8px; padding: 24px; margin: 24px 0; background: #fbfcfd; }
+    .section-chart { list-style: none; }
+    .section-chart li { display: grid; grid-template-columns: 65px minmax(0, 1fr) max-content; align-items: center; gap: 12px; margin: 16px 0; }
+    .section-track { background: #e9eef2; height: 22px; border-radius: 4px; overflow: hidden; }
+    .section-fill { display: block; height: 100%; border-radius: 4px; }
+    .section-count { text-align: right; font-variant-numeric: tabular-nums; }
+    .bar-blog { background: #1a5b8c; }
+    .bar-haiku { background: #337e52; }
+    .bar-poetry { background: #7e5499; }
+    .bar-social { background: #c58b27; }
+    .bar-papers { background: #b8482e; }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 16px; list-style: none; margin-bottom: 20px; font-size: .9em; }
+    .chart-key { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; }
+    .interval-scroll { overflow-x: auto; padding-top: 12px; }
+    .interval-chart { display: flex; gap: 14px; min-width: max-content; list-style: none; }
+    .interval-column { flex: 0 0 64px; text-align: center; font-size: .8em; }
+    .interval-plot { height: 220px; display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid #ccd5db; }
+    .interval-stack { width: 40px; position: relative; display: flex; flex-direction: column-reverse; }
+    .interval-segment { display: block; flex-shrink: 0; width: 100%; }
+    .interval-value { position: absolute; top: -24px; left: 50%; transform: translateX(-50%); font-variant-numeric: tabular-nums; color: #333; }
+    .interval-date { display: block; margin-top: 10px; color: #586773; }
+    @media (max-width: 520px) {
+        .stats-chart { padding: 16px; }
+        .section-chart li { grid-template-columns: 55px minmax(0, 1fr) max-content; gap: 8px; font-size: .85em; }
+    }
+{% endblock extra_styles %}
+
+{% block content %}
+    <h1>Visit History</h1>
+    <p class="stats-summary"><strong>{{ counts.total | comma_separated }}</strong> page visits</p>
+
+    {% if persistence_error %}
+    <p class="stats-warning" role="alert">Visit counts are updating, but saving is temporarily unavailable.</p>
+    {% endif %}
+
+    <h2>Visits by section</h2>
+    <figure class="stats-chart" aria-label="Cumulative visits by section">
+        <ul class="section-chart">
+            {% for bar in section_bars %}
+            <li>
+                <span>{{ bar.name }}</span>
+                <span class="section-track" aria-hidden="true"><span class="section-fill bar-{{ bar.key }}" style="width: {{ bar.percent }}%;"></span></span>
+                <span class="section-count">{{ bar.count | comma_separated }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </figure>
+    {% if checkpoint_at %}
+    <p class="stats-note">Last saved: <time>{{ checkpoint_at | escape }}</time> (UTC).</p>
+    {% endif %}
+    {% if since_snapshot %}
+    <p><strong>{{ since_snapshot.total | comma_separated }}</strong> visits since the latest snapshot.</p>
+    {% endif %}
+
+    <h2>Recent visits</h2>
+    {% if interval_bars %}
+    <figure class="stats-chart" aria-label="Visits by recorded interval">
+        <ul class="chart-legend" aria-label="Sections">
+            {% for bar in section_bars %}
+            <li><span class="chart-key bar-{{ bar.key }}" aria-hidden="true"></span>{{ bar.name }}</li>
+            {% endfor %}
+        </ul>
+        <div class="interval-scroll" tabindex="0" role="region" aria-label="Scrollable visit chart">
+            <ol class="interval-chart">
+                {% for bar in interval_bars %}
+                <li class="interval-column" aria-label="{{ bar.period | escape }}: {{ bar.total | comma_separated }} visits">
+                    <div class="interval-plot" aria-hidden="true">
+                        <div class="interval-stack" style="height: {{ bar.percent }}%;">
+                            <span class="interval-value">{{ bar.total | comma_separated }}</span>
+                            {% for section in bar.sections %}
+                            <span class="interval-segment bar-{{ section.key }}" style="height: {{ section.percent }}%;" title="{{ section.name }}: {{ section.count | comma_separated }} visits ({{ bar.period | escape }})"></span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <span class="interval-date" title="{{ bar.period | escape }}">{{ bar.label }}</span>
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+        <figcaption class="stats-note">Recorded intervals, oldest to newest. All dates UTC; intervals may span multiple days.</figcaption>
+    </figure>
+    {% else %}
+    <p class="stats-note">Recent visits will appear after the next snapshot.</p>
+    {% endif %}
+
+    <h2>History</h2>
+    {% if history %}
+    <div class="stats-scroll">
+        <table class="stats-table">
+            <caption>Latest 90 snapshots (UTC)</caption>
+            <thead><tr><th scope="col">Saved (UTC)</th><th scope="col">Since (UTC)</th><th scope="col">Blog</th><th scope="col">Haiku</th><th scope="col">Poetry</th><th scope="col">Social</th><th scope="col">Papers</th><th scope="col">Interval total</th><th scope="col">Cumulative total</th></tr></thead>
+            <tbody>
+                {% for snapshot in history %}
+                <tr>
+                    <td><time>{{ snapshot.recorded_at | escape }}</time></td>
+                    <td>{% if snapshot.since %}<time>{{ snapshot.since | escape }}</time>{% else %}Baseline{% endif %}</td>
+                    <td>{{ snapshot.visits.blog | comma_separated }}</td><td>{{ snapshot.visits.haiku | comma_separated }}</td>
+                    <td>{{ snapshot.visits.poetry | comma_separated }}</td><td>{{ snapshot.visits.social | comma_separated }}</td>
+                    <td>{{ snapshot.visits.papers | comma_separated }}</td><td>{{ snapshot.visits.total | comma_separated }}</td>
+                    <td>{{ snapshot.counts.total | comma_separated }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No history yet.</p>
+    {% endif %}
+{% endblock content %}

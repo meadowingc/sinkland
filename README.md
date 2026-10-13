@@ -98,5 +98,44 @@ Cloudflare edge rate-limiting rules can stop traffic before it reaches the Pi.
 To deploy this feature, install a release containing it with the Pi installer;
 updating the checkout alone does not update the running release binary.
 
+## Persistent visit counts
+
+The footer's **Visit history** link opens `/visits`, showing live per-section
+totals and the most recent 90 daily snapshots, including interval deltas and
+cumulative totals. Bar charts show totals by section and the latest 30 recorded
+intervals, without JavaScript or external services. It does not count its own views. These are page requests,
+including repeat visits and crawlers, not unique visitors. Counting behavior
+for existing sections is unchanged; some failed page requests may count, but
+rate-limited requests and images/static files do not. No visitor IPs or personal
+details are stored.
+
+The app saves a row to `visits.jsonl` on the first run, then shortly after each
+UTC date change (checked once a minute). The initial row preserves the previous
+hard-coded starting totals as a baseline, **not** newly measured daily traffic.
+Each subsequent row contains the timestamp, preceding snapshot timestamp,
+cumulative section counts, and visits since that snapshot. After downtime, that
+interval may span multiple days; the app does not invent daily breakdowns.
+The complete history stays on disk even though the page shows only 90 rows.
+
+For restart safety, `visits.json` is atomically replaced every five minutes and
+on graceful shutdown (`SIGTERM`/`SIGINT`). Totals are restored before serving
+requests. A crash or power loss can lose visits since the last checkpoint;
+ordinary `systemctl restart sinkland` preserves the latest totals. Interrupted
+final JSONL writes are repaired on startup; other corrupt/unsupported state
+fails startup explicitly rather than silently resetting counters. Periodic
+write failures are logged and shown as a warning on `/visits`, with retries.
+
+Set `SINKLAND_STATE_DIR` to choose the storage directory (default: `./state`).
+Only one app instance can use a directory at a time. Keep it outside a release
+directory and retain both data files when backing up or migrating.
+
+The updated Pi installer configures systemd `StateDirectory=sinkland`, with
+state at `/var/lib/sinkland` (systemd may back this with `/var/lib/private/sinkland`
+for the dynamic service user). This remains writable with the service's
+filesystem protections and survives restarts and release updates. Existing
+environment settings are preserved. To activate this feature, install a release
+containing it and rerun the updated installer, not just `git pull`. Counts already
+lost by older versions cannot be recovered.
+
 The poetry rhyme data uses the CMU Pronouncing Dictionary; its notice is in
 [`corpus/poetry/CMU-LICENSE.txt`](corpus/poetry/CMU-LICENSE.txt).

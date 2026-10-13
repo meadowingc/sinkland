@@ -2,10 +2,12 @@
 name = "sinkland"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.89"
 
 [dependencies]
 poem = { version = "3.1.12", features = ["server", "compression", "static-files", "embed"] }
-tokio = { version = "1.17.0", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.17.0", features = ["rt-multi-thread", "macros", "signal"] }
+chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
 serde = { version = "1.0.140", features = ["derive"] }
 serde_json = "1.0"
 tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
@@ -24,3 +26,6 @@ reqwest = { version = "0.12", features = ["blocking", "json"] }
 rss = "2.0"
 serde_json = "1.0"
 parquet = "53.3.0"
+
+[dev-dependencies]
+tempfile = "3"

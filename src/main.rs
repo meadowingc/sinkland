@@ -4,6 +4,7 @@ mod papers;
 mod poetry;
 mod rate_limit;
 mod tags;
+mod visits;
 
 use data::{BOOK_DATA, FRIENDS_LIST, HAIKU_DATA};
 use generators::blog;
@@ -34,8 +35,8 @@ use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use tera::{Context, Tera};
+use visits::{Section, VISITS, VisitCounts};
 
 static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
     let mut tera = match Tera::new("templates/**/*") {
@@ -46,105 +47,32 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
         }
     };
     tera.autoescape_on(vec![".html", ".sql"]);
+    tera.register_filter("comma_separated", visits::comma_separated);
     tera
 });
 
-// Section-specific visit counters
-
-// as of 2025-12-18
-static BLOG_VISITS: AtomicUsize = AtomicUsize::new(1858815);
-static HAIKU_VISITS: AtomicUsize = AtomicUsize::new(18444);
-static POETRY_VISITS: AtomicUsize = AtomicUsize::new(552);
-static SOCIAL_VISITS: AtomicUsize = AtomicUsize::new(6192);
-static PAPER_VISITS: AtomicUsize = AtomicUsize::new(1272458);
-
-/// Visit counts for all sections
-#[derive(Clone)]
-struct VisitCounts {
-    blog: usize,
-    haiku: usize,
-    poetry: usize,
-    social: usize,
-    papers: usize,
-    total: usize,
-}
-
-/// Increment blog visits and return all counts
 fn increment_blog_visits() -> VisitCounts {
-    let blog = BLOG_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
-    let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
-    let poetry = POETRY_VISITS.load(Ordering::Relaxed);
-    let social = SOCIAL_VISITS.load(Ordering::Relaxed);
-    let papers = PAPER_VISITS.load(Ordering::Relaxed);
-    VisitCounts {
-        blog,
-        haiku,
-        poetry,
-        social,
-        papers,
-        total: blog + haiku + poetry + social + papers,
-    }
+    VISITS.increment(Section::Blog)
 }
 
-/// Increment haiku visits and return all counts
 fn increment_haiku_visits() -> VisitCounts {
-    let blog = BLOG_VISITS.load(Ordering::Relaxed);
-    let haiku = HAIKU_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
-    let poetry = POETRY_VISITS.load(Ordering::Relaxed);
-    let social = SOCIAL_VISITS.load(Ordering::Relaxed);
-    let papers = PAPER_VISITS.load(Ordering::Relaxed);
-    VisitCounts {
-        blog,
-        haiku,
-        poetry,
-        social,
-        papers,
-        total: blog + haiku + poetry + social + papers,
-    }
+    VISITS.increment(Section::Haiku)
 }
 
-/// Increment social visits and return all counts
 fn increment_social_visits() -> VisitCounts {
-    let blog = BLOG_VISITS.load(Ordering::Relaxed);
-    let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
-    let poetry = POETRY_VISITS.load(Ordering::Relaxed);
-    let social = SOCIAL_VISITS.fetch_add(1, Ordering::Relaxed) + 1;
-    let papers = PAPER_VISITS.load(Ordering::Relaxed);
-    VisitCounts {
-        blog,
-        haiku,
-        poetry,
-        social,
-        papers,
-        total: blog + haiku + poetry + social + papers,
-    }
+    VISITS.increment(Section::Social)
 }
 
-/// Get current visit counts without incrementing (for index page)
 fn get_visit_counts() -> VisitCounts {
-    let blog = BLOG_VISITS.load(Ordering::Relaxed);
-    let haiku = HAIKU_VISITS.load(Ordering::Relaxed);
-    let poetry = POETRY_VISITS.load(Ordering::Relaxed);
-    let social = SOCIAL_VISITS.load(Ordering::Relaxed);
-    let papers = PAPER_VISITS.load(Ordering::Relaxed);
-    VisitCounts {
-        blog,
-        haiku,
-        poetry,
-        social,
-        papers,
-        total: blog + haiku + poetry + social + papers,
-    }
+    VISITS.counts()
 }
 
 fn increment_paper_visits() -> VisitCounts {
-    PAPER_VISITS.fetch_add(1, Ordering::Relaxed);
-    get_visit_counts()
+    VISITS.increment(Section::Papers)
 }
 
 fn increment_poetry_visits() -> VisitCounts {
-    POETRY_VISITS.fetch_add(1, Ordering::Relaxed);
-    get_visit_counts()
+    VISITS.increment(Section::Poetry)
 }
 
 /// Helper to insert visit counts into template context
@@ -1008,6 +936,7 @@ fn routes() -> Route {
         .at("/tags", get(tags::index))
         .at("/tags/:tag", get(tags::feed))
         .at("/robots.txt", get(robots_txt))
+        .at("/visits", get(visits::page))
         .nest("/papers", papers::routes())
         // Social media routes
         .at("/social", get(social_feed))
@@ -1035,6 +964,8 @@ async fn main() -> Result<(), std::io::Error> {
     .parse::<std::net::SocketAddr>()
     .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
 
+    let shutdown = shutdown_signal()?;
+    let store = visits::Store::open(&visits::state_dir()?, &VISITS, visits::now())?;
     println!("Starting server on http://{}", bind_address);
     println!(
         "Loaded {} titles and {} sentences from books",
@@ -1064,7 +995,51 @@ async fn main() -> Result<(), std::io::Error> {
         memory_usage
     );
 
-    Server::new(TcpListener::bind(bind_address)).run(app).await
+    let (stop, stopped) = std::sync::mpsc::channel();
+    let tracker = VISITS.clone();
+    let saver = std::thread::Builder::new()
+        .name("visit-persistence".into())
+        .spawn(move || store.run(tracker, stopped))?;
+    let served = Server::new(TcpListener::bind(bind_address))
+        .run_with_graceful_shutdown(app, shutdown, Some(std::time::Duration::from_secs(10)))
+        .await;
+    if stop.send(()).is_err() {
+        eprintln!("Visit persistence worker stopped before shutdown");
+    }
+    let saved = tokio::task::spawn_blocking(move || {
+        saver
+            .join()
+            .map_err(|_| std::io::Error::other("Visit persistence worker panicked"))?
+    })
+    .await
+    .map_err(std::io::Error::other)?;
+    if let Err(error) = &saved {
+        eprintln!("Could not save final visit counts: {error}");
+    }
+    served.and(saved)
+}
+
+fn shutdown_signal() -> std::io::Result<impl std::future::Future<Output = ()>> {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut terminate = signal(SignalKind::terminate())?;
+        let mut interrupt = signal(SignalKind::interrupt())?;
+        Ok(async move {
+            tokio::select! {
+                _ = terminate.recv() => {}
+                _ = interrupt.recv() => {}
+            }
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(async {
+            if let Err(error) = tokio::signal::ctrl_c().await {
+                eprintln!("Could not listen for shutdown signal: {error}");
+            }
+        })
+    }
 }
 
 #[cfg(test)]

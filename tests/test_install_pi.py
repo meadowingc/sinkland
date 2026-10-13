@@ -177,6 +177,14 @@ class InstallerTests(unittest.TestCase):
             "Environment=SINKLAND_TRUST_CLOUDFLARE=true",
             (self.units / "sinkland.service").read_text(),
         )
+        app_unit = (self.units / "sinkland.service").read_text()
+        for setting in (
+            "StateDirectory=sinkland",
+            "StateDirectoryMode=0700",
+            "Environment=SINKLAND_STATE_DIR=/var/lib/sinkland",
+            "TimeoutStopSec=30",
+        ):
+            self.assertIn(setting, app_unit)
         self.assertFalse((self.units / "cloudflared.service").exists())
         self.assertIn(
             f"ExecStart={self.install_root}/bin/cloudflared ",
@@ -209,6 +217,7 @@ class InstallerTests(unittest.TestCase):
             "SINKLAND_RATE_LIMIT_IP_RPS=3\n"
             "SINKLAND_RATE_LIMIT_GLOBAL_RPS=8\n"
             "SINKLAND_RATE_LIMIT_CONCURRENCY=2\n"
+            "SINKLAND_STATE_DIR=/var/lib/sinkland\n"
         )
         (self.config / "sinkland.env").write_text(settings)
         self.make_release("v0.2.0")

@@ -134,6 +134,10 @@ ExecStart=$INSTALL_ROOT/current/sinkland
 EnvironmentFile=$CONFIG_DIR/sinkland.env
 Environment=SINKLAND_BIND=127.0.0.1:43796
 Environment=SINKLAND_TRUST_CLOUDFLARE=true
+Environment=SINKLAND_STATE_DIR=/var/lib/sinkland
+StateDirectory=sinkland
+StateDirectoryMode=0700
+TimeoutStopSec=30
 Restart=on-failure
 RestartSec=5
 Nice=10

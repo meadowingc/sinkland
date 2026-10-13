@@ -197,12 +197,13 @@
         <div class="footer-container">
             <p class="footer-text">
                 📊 Page visits: 
-                <span class="visit-stat">📚 Blog: <strong>{{ blog_visits | default(value=0) }}</strong></span> · 
-                <span class="visit-stat">🍃 Haiku: <strong>{{ haiku_visits | default(value=0) }}</strong></span> · 
-                <span class="visit-stat">✒ Poetry: <strong>{{ poetry_visits | default(value=0) }}</strong></span> ·
-                <span class="visit-stat">💬 Social: <strong>{{ social_visits | default(value=0) }}</strong></span> ·
-                <span class="visit-stat">📄 Papers: <strong>{{ paper_visits | default(value=0) }}</strong></span><br/>
-                <span class="visit-stat">🌐 Total: <strong>{{ total_visits | default(value=0) }}</strong></span>
+                <span class="visit-stat">📚 Blog: <strong>{{ blog_visits | default(value=0) | comma_separated }}</strong></span> ·
+                <span class="visit-stat">🍃 Haiku: <strong>{{ haiku_visits | default(value=0) | comma_separated }}</strong></span> ·
+                <span class="visit-stat">✒ Poetry: <strong>{{ poetry_visits | default(value=0) | comma_separated }}</strong></span> ·
+                <span class="visit-stat">💬 Social: <strong>{{ social_visits | default(value=0) | comma_separated }}</strong></span> ·
+                <span class="visit-stat">📄 Papers: <strong>{{ paper_visits | default(value=0) | comma_separated }}</strong></span><br/>
+                <span class="visit-stat">🌐 Total: <strong>{{ total_visits | default(value=0) | comma_separated }}</strong></span>
+                <br/><a href="/visits" rel="nofollow noopener noreferrer" style="color: #ecf0f1;">Visit history</a>
             </p>
         </div>
     </footer>

@@ -2,3 +2,4 @@
 /assets/
 .env
 __pycache__/
+/state/
