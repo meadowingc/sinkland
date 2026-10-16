@@ -7,16 +7,16 @@
         <h1>{{ paper.metadata.title | escape }}</h1>
         <ul class="paper-authors">
         {% for researcher in paper.metadata.authors %}
-            <li><a href="/papers/author/{{ researcher.id | escape }}" rel="nofollow">{{ researcher.name | escape }}</a><span class="paper-meta">{{ researcher.affiliation | escape }}</span></li>
+            <li><a href="/papers/author/{{ researcher.id | escape }}" rel="nofollow" data-sinkland-link>{{ researcher.name | escape }}</a><span class="paper-meta">{{ researcher.affiliation | escape }}</span></li>
         {% endfor %}
         </ul>
         <div class="paper-meta">Archive ID: {{ paper.metadata.id | escape }}</div>
     </header>
     {% if tagged_thread %}
     <nav aria-label="Related thread">
-        <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow">#{{ tagged_thread.tag_label | escape }}</a>
-        · <a href="{{ tagged_thread.blog_url | escape }}" rel="nofollow">{{ tagged_thread.blog_title | escape }}</a>
-        · <a href="{{ tagged_thread.social_post_url | escape }}" rel="nofollow">Post by @{{ tagged_thread.social_username | escape }}</a>
+        <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow" data-sinkland-link>#{{ tagged_thread.tag_label | escape }}</a>
+        · <a href="{{ tagged_thread.blog_url | escape }}" rel="nofollow" data-sinkland-link>{{ tagged_thread.blog_title | escape }}</a>
+        · <a href="{{ tagged_thread.social_post_url | escape }}" rel="nofollow" data-sinkland-link>Post by @{{ tagged_thread.social_username | escape }}</a>
     </nav>
     {% endif %}
     <details class="paper-citation">
@@ -66,12 +66,12 @@
     {% endfor %}
     <section><h2>References</h2>
         <ol class="references">{% for reference in paper.references %}
-            <li>{% for researcher in reference.authors %}<a href="/papers/author/{{ researcher.id | escape }}" rel="nofollow">{{ researcher.name | escape }}</a>{% if not loop.last %}, {% endif %}{% endfor %} ({{ reference.year }}). <a href="/papers/p/{{ reference.id | escape }}" rel="nofollow">{{ reference.title | escape }}</a>.</li>
+            <li>{% for researcher in reference.authors %}<a href="/papers/author/{{ researcher.id | escape }}" rel="nofollow" data-sinkland-link>{{ researcher.name | escape }}</a>{% if not loop.last %}, {% endif %}{% endfor %} ({{ reference.year }}). <a href="/papers/p/{{ reference.id | escape }}" rel="nofollow" data-sinkland-link>{{ reference.title | escape }}</a>.</li>
         {% endfor %}</ol>
     </section>
     <section><h2>Related publications</h2>
         <ul class="references">{% for reference in paper.related %}
-            <li><a href="/papers/p/{{ reference.id | escape }}" rel="nofollow">{{ reference.title | escape }}</a></li>
+            <li><a href="/papers/p/{{ reference.id | escape }}" rel="nofollow" data-sinkland-link>{{ reference.title | escape }}</a></li>
         {% endfor %}</ul>
     </section>
 </article>

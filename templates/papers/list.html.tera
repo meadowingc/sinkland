@@ -5,8 +5,8 @@
 {% if author %}<p class="paper-meta">{{ author.affiliation | escape }}</p>{% endif %}
 {% for entry in results %}
 <article class="paper-card">
-    <h2><a href="/papers/p/{{ entry.id | escape }}" rel="nofollow">{{ entry.title | escape }}</a></h2>
-    <div class="paper-meta">{% for researcher in entry.authors %}<a href="/papers/author/{{ researcher.id | escape }}" rel="nofollow">{{ researcher.name | escape }}</a>{% if not loop.last %}, {% endif %}{% endfor %} · {{ entry.year }} · {{ entry.category_name | escape }}</div>
+    <h2><a href="/papers/p/{{ entry.id | escape }}" rel="nofollow" data-sinkland-link>{{ entry.title | escape }}</a></h2>
+    <div class="paper-meta">{% for researcher in entry.authors %}<a href="/papers/author/{{ researcher.id | escape }}" rel="nofollow" data-sinkland-link>{{ researcher.name | escape }}</a>{% if not loop.last %}, {% endif %}{% endfor %} · {{ entry.year }} · {{ entry.category_name | escape }}</div>
     <p class="paper-preview">{{ entry.abstract_preview | escape }}</p>
 </article>
 {% endfor %}

@@ -190,7 +190,7 @@
     </nav>
     
     <div class="content">
-        {% block content %}{% endblock content %}
+        {% filter origin_links %}{% block content %}{% endblock content %}{% endfilter %}
     </div>
     
     <footer class="site-footer">

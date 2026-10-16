@@ -32,7 +32,7 @@
         <h2>More Reflections</h2>
         <ul>
             {% for link in links %}
-            <li><a href="{{ link.1 | escape }}" rel="nofollow noopener noreferrer" style="font-style: italic;">{{ link.0 | escape }}</a></li>
+            <li><a href="{{ link.1 | escape }}" rel="nofollow noopener noreferrer" style="font-style: italic;" data-sinkland-link>{{ link.0 | escape }}</a></li>
             {% endfor %}
         </ul>
     </div>

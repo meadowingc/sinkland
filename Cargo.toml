@@ -20,6 +20,9 @@ urlencoding = "2.1"
 image = "0.25"
 dotenvy = "0.15"
 plotters = { version = "0.3.7", default-features = false, features = ["svg_backend", "line_series", "point_series", "area_series", "histogram", "boxplot", "errorbar"] }
+url = "2.5"
+lol_html = "2"
+html-escape = "0.2"
 
 [build-dependencies]
 reqwest = { version = "0.12", features = ["blocking", "json"] }

@@ -20,7 +20,7 @@
         <h2>Featured Articles</h2>
         <ul>
             {% for post in featured_posts %}
-            <li><a href="{{ post.url | escape }}" rel="nofollow noopener noreferrer">{{ post.title | escape }}</a><p class="featured-preview">{{ post.preview | truncate(length=180) | escape }}</p></li>
+            <li><a href="{{ post.url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ post.title | escape }}</a><p class="featured-preview">{{ post.preview | truncate(length=180) | escape }}</p></li>
             {% endfor %}
         </ul>
     </div>
@@ -30,10 +30,10 @@
         <p><a href="/poetry" rel="nofollow noopener noreferrer">Explore poetry</a>.</p>
         <ul>
             {% for poem in poetry_links %}
-            <li><a href="{{ poem.url | escape }}" rel="nofollow noopener noreferrer">{{ poem.title | escape }}</a></li>
+            <li><a href="{{ poem.url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ poem.title | escape }}</a></li>
             {% endfor %}
             {% for haiku_link in haiku_links %}
-            <li><a href="{{ haiku_link.1 | escape }}" rel="nofollow noopener noreferrer" style="font-style: italic;">{{ haiku_link.0 | escape }}</a></li>
+            <li><a href="{{ haiku_link.1 | escape }}" rel="nofollow noopener noreferrer" style="font-style: italic;" data-sinkland-link>{{ haiku_link.0 | escape }}</a></li>
             {% endfor %}
         </ul>
     </div>
@@ -49,8 +49,8 @@
         <h2>Community & Discussion</h2>
         <ul>
             <li><a href="/social" rel="nofollow noopener noreferrer">🐦 SinkNet Social Feed</a> - See what the community is sharing</li>
-            <li><a href="/social/user/cosmic_dreamer" rel="nofollow noopener noreferrer">Featured: @cosmic_dreamer</a></li>
-            <li><a href="/social/user/silent_river42" rel="nofollow noopener noreferrer">Featured: @silent_river42</a></li>
+            <li><a href="/social/user/cosmic_dreamer" rel="nofollow noopener noreferrer" data-sinkland-link>Featured: @cosmic_dreamer</a></li>
+            <li><a href="/social/user/silent_river42" rel="nofollow noopener noreferrer" data-sinkland-link>Featured: @silent_river42</a></li>
         </ul>
     </div>
 {% endblock content %}

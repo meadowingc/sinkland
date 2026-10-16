@@ -886,7 +886,7 @@ fn hashtag_to_link(tag: &str) -> String {
     // Tag includes the # already
     let tag_name = tag.trim_start_matches('#');
     format!(
-        r#"<a href="/social/search/{}" style="color: #1da1f2; text-decoration: none;" rel="nofollow noopener noreferrer">{}</a>"#,
+        r#"<a href="/social/search/{}" style="color: #1da1f2; text-decoration: none;" rel="nofollow noopener noreferrer" data-sinkland-link>{}</a>"#,
         urlencoding::encode(tag_name),
         tag
     )
@@ -984,7 +984,7 @@ fn interested_in_papers(username: &str) -> bool {
 fn generate_paper_post_content<R: Rng>(rng: &mut R) -> String {
     let paper = papers::random_metadata(rng);
     let link = format!(
-        r#"<a class="paper-link" href="/papers/p/{}" rel="nofollow noopener noreferrer">{}</a>"#,
+        r#"<a class="paper-link" href="/papers/p/{}" rel="nofollow noopener noreferrer" data-sinkland-link>{}</a>"#,
         paper.id,
         tera::escape_html(&paper.title)
     );

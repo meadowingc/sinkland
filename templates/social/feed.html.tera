@@ -250,7 +250,7 @@
         <h3>Trending</h3>
         {% for topic in trending %}
         <div class="trending-item">
-            <a href="/social/search/{{ topic.0 | urlencode }}" class="trending-topic" rel="nofollow noopener noreferrer">{{ topic.0 }}</a>
+            <a href="/social/search/{{ topic.0 | urlencode }}" class="trending-topic" rel="nofollow noopener noreferrer" data-sinkland-link>{{ topic.0 }}</a>
             <div class="trending-posts">{{ topic.1 }} posts</div>
         </div>
         {% endfor %}
@@ -259,16 +259,16 @@
     {% for post in posts %}
     <article class="post-card">
         <div class="post-header">
-            <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">
+            <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer" data-sinkland-link>
                 <img src="/social/avatar/{{ post.author.username }}.png" alt="Avatar for {{ post.author.display_name }}" class="avatar">
             </a>
             <div class="user-info">
-                <a href="/social/user/{{ post.author.username }}" class="display-name" rel="nofollow noopener noreferrer">
+                <a href="/social/user/{{ post.author.username }}" class="display-name" rel="nofollow noopener noreferrer" data-sinkland-link>
                     {{ post.author.display_name }}
                     {% if post.author.verified %}<span class="verified-badge">✓</span>{% endif %}
                 </a>
                 <div class="username">
-                    <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer">@{{ post.author.username }}</a>
+                    <a href="/social/user/{{ post.author.username }}" rel="nofollow noopener noreferrer" data-sinkland-link>@{{ post.author.username }}</a>
                     · <span class="post-time">{{ post.relative_time }}</span>
                 </div>
             </div>
@@ -279,7 +279,7 @@
         </div>
         
         {% if post.has_image %}
-        <a href="/social/post/{{ post.id }}" rel="nofollow noopener noreferrer">
+        <a href="/social/post/{{ post.id }}" rel="nofollow noopener noreferrer" data-sinkland-link>
             <img src="/social/media/{{ post.image_id }}.png" alt="{{ post.image_alt | default(value='Post image') }}" class="post-image">
         </a>
         {% endif %}
@@ -305,11 +305,11 @@
         <h3>Who to follow</h3>
         {% for user in suggested_users %}
         <div class="suggested-user">
-            <a href="/social/user/{{ user.username }}" rel="nofollow noopener noreferrer">
+            <a href="/social/user/{{ user.username }}" rel="nofollow noopener noreferrer" data-sinkland-link>
                 <img src="/social/avatar/{{ user.username }}.png" alt="Avatar for {{ user.display_name }}" class="avatar">
             </a>
             <div class="user-info">
-                <a href="/social/user/{{ user.username }}" class="display-name" rel="nofollow noopener noreferrer">
+                <a href="/social/user/{{ user.username }}" class="display-name" rel="nofollow noopener noreferrer" data-sinkland-link>
                     {{ user.display_name }}
                     {% if user.verified %}<span class="verified-badge">✓</span>{% endif %}
                 </a>

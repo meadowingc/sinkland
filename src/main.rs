@@ -1,5 +1,6 @@
 mod data;
 mod generators;
+mod origins;
 mod papers;
 mod poetry;
 mod rate_limit;
@@ -39,6 +40,11 @@ use tera::{Context, Tera};
 use visits::{Section, VISITS, VisitCounts};
 
 static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
+    Lazy::force(&data::ENV_LOADED);
+    let origins = origins::Origins::from_env().unwrap_or_else(|error| {
+        eprintln!("Origin configuration error: {error}");
+        ::std::process::exit(1);
+    });
     let mut tera = match Tera::new("templates/**/*") {
         Ok(t) => t,
         Err(e) => {
@@ -48,6 +54,7 @@ static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
     };
     tera.autoescape_on(vec![".html", ".sql"]);
     tera.register_filter("comma_separated", visits::comma_separated);
+    tera.register_filter("origin_links", origins);
     tera
 });
 
@@ -951,6 +958,7 @@ fn routes() -> Route {
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
+    Lazy::force(&TEMPLATES);
     generators::poetry::validate_lexicon().map_err(std::io::Error::other)?;
     let app = routes().with(rate_limit::RateLimit::new(rate_limit::Config::from_env()?));
 

@@ -6,7 +6,7 @@
 <h1>Topics</h1>
 <ul class="links">
     {% for tag in tags %}
-    <li><a href="/tags/{{ tag.slug | escape }}" rel="nofollow noopener noreferrer">{{ tag.label | escape }}</a><br>{{ tag.description | escape }}</li>
+    <li><a href="/tags/{{ tag.slug | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ tag.label | escape }}</a><br>{{ tag.description | escape }}</li>
     {% endfor %}
 </ul>
 {% endblock content %}

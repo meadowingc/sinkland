@@ -15,12 +15,12 @@
    <a href="/tags/{{ tag_slug | escape }}" rel="nofollow noopener noreferrer">Next page</a></p>
 {% for thread in threads %}
 <article class="topic-thread">
-    <h2><a href="{{ thread.blog_url | escape }}" rel="nofollow noopener noreferrer">{{ thread.blog_title | escape }}</a></h2>
+    <h2><a href="{{ thread.blog_url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ thread.blog_title | escape }}</a></h2>
     <p>{{ thread.blog_preview | truncate(length=180) | escape }}</p>
-    <p>Research: <a href="{{ thread.paper_url | escape }}" rel="nofollow noopener noreferrer">{{ thread.paper_title | escape }}</a></p>
+    <p>Research: <a href="{{ thread.paper_url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ thread.paper_title | escape }}</a></p>
     <p>{{ thread.paper_preview | truncate(length=180) | escape }}</p>
-    <p>Conversation: <a href="{{ thread.social_url | escape }}" rel="nofollow noopener noreferrer">{{ thread.social_name | escape }}</a>
-       · <a href="{{ thread.post_url | escape }}" rel="nofollow noopener noreferrer">Read the post</a></p>
+    <p>Conversation: <a href="{{ thread.social_url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ thread.social_name | escape }}</a>
+       · <a href="{{ thread.post_url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>Read the post</a></p>
     <p>{{ thread.post_preview | escape }}</p>
 </article>
 {% endfor %}

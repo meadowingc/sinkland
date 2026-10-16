@@ -21,7 +21,7 @@
         <h2>More poems</h2>
         <ul>
             {% for entry in related %}
-            <li><a href="{{ entry.url | escape }}" rel="nofollow noopener noreferrer">{{ entry.title | escape }}</a></li>
+            <li><a href="{{ entry.url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ entry.title | escape }}</a></li>
             {% endfor %}
         </ul>
     </div>

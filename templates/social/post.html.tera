@@ -303,16 +303,16 @@
     
     <article class="main-post">
         <div class="post-header">
-            <a href="/social/user/{{ post.author.username | escape }}" rel="nofollow noopener noreferrer">
+            <a href="/social/user/{{ post.author.username | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>
                 <img src="/social/avatar/{{ post.author.username | escape }}.png" alt="Avatar for {{ post.author.display_name | escape }}" class="avatar large">
             </a>
             <div class="user-info">
-                <a href="/social/user/{{ post.author.username | escape }}" class="display-name" rel="nofollow noopener noreferrer">
+                <a href="/social/user/{{ post.author.username | escape }}" class="display-name" rel="nofollow noopener noreferrer" data-sinkland-link>
                     {{ post.author.display_name | escape }}
                     {% if post.author.verified %}<span class="verified-badge">✓</span>{% endif %}
                 </a>
                 <div class="username">
-                    <a href="/social/user/{{ post.author.username | escape }}" rel="nofollow noopener noreferrer">@{{ post.author.username | escape }}</a>
+                    <a href="/social/user/{{ post.author.username | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>@{{ post.author.username | escape }}</a>
                 </div>
             </div>
         </div>
@@ -320,7 +320,7 @@
         <div class="post-content">
             {% if tagged_thread %}
             {{ post.content | escape }}
-            <p><a href="{{ tagged_thread.blog_url | escape }}" rel="nofollow">{{ tagged_thread.blog_title | escape }}</a> · <a href="{{ tagged_thread.paper_url | escape }}" rel="nofollow">{{ tagged_thread.paper_title | escape }}</a> · <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow">#{{ tagged_thread.tag_label | escape }}</a></p>
+            <p><a href="{{ tagged_thread.blog_url | escape }}" rel="nofollow" data-sinkland-link>{{ tagged_thread.blog_title | escape }}</a> · <a href="{{ tagged_thread.paper_url | escape }}" rel="nofollow" data-sinkland-link>{{ tagged_thread.paper_title | escape }}</a> · <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow" data-sinkland-link>#{{ tagged_thread.tag_label | escape }}</a></p>
             {% else %}
             {{ post.content | safe }}
             {% endif %}
@@ -367,23 +367,23 @@
         {% for comment in comments %}
         <article class="comment-card">
             <div class="comment-header">
-                <a href="/social/user/{{ comment.author.username | escape }}" rel="nofollow noopener noreferrer">
+                <a href="/social/user/{{ comment.author.username | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>
                     <img src="/social/avatar/{{ comment.author.username | escape }}.png" alt="Avatar for {{ comment.author.display_name | escape }}" class="avatar">
                 </a>
                 <div class="user-info">
-                    <a href="/social/user/{{ comment.author.username | escape }}" class="display-name" rel="nofollow noopener noreferrer">
+                    <a href="/social/user/{{ comment.author.username | escape }}" class="display-name" rel="nofollow noopener noreferrer" data-sinkland-link>
                         {{ comment.author.display_name | escape }}
                         {% if comment.author.verified %}<span class="verified-badge">✓</span>{% endif %}
                     </a>
                     <div class="username">
-                        <a href="/social/user/{{ comment.author.username | escape }}" rel="nofollow noopener noreferrer">@{{ comment.author.username | escape }}</a>
+                        <a href="/social/user/{{ comment.author.username | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>@{{ comment.author.username | escape }}</a>
                         · {{ comment.relative_time | escape }}
                     </div>
                 </div>
             </div>
             
             <div class="comment-content">
-                Replying to <a href="/social/user/{{ post.author.username | escape }}" style="color: #1da1f2;" rel="nofollow noopener noreferrer">@{{ post.author.username | escape }}</a>
+                Replying to <a href="/social/user/{{ post.author.username | escape }}" style="color: #1da1f2;" rel="nofollow noopener noreferrer" data-sinkland-link>@{{ post.author.username | escape }}</a>
                 <br><br>
                 {{ comment.content | escape }}
             </div>
@@ -402,15 +402,15 @@
         <h3>More posts you might like</h3>
         {% for related in related_posts %}
         <div class="related-post">
-            <a href="/social/user/{{ related.author.username | escape }}" rel="nofollow noopener noreferrer">
+            <a href="/social/user/{{ related.author.username | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>
                 <img src="/social/avatar/{{ related.author.username | escape }}.png" alt="Avatar for {{ related.author.display_name | escape }}" class="avatar">
             </a>
             <span class="user-info">
-                <a href="/social/post/{{ related.id | escape }}" class="display-name" rel="nofollow noopener noreferrer" style="display: block;">
+                <a href="/social/post/{{ related.id | escape }}" class="display-name" rel="nofollow noopener noreferrer" style="display: block;" data-sinkland-link>
                     {{ related.author.display_name | escape }}
                     {% if related.author.verified %}<span class="verified-badge">✓</span>{% endif %}
                 </a>
-                <a href="/social/post/{{ related.id | escape }}" class="preview" rel="nofollow noopener noreferrer" style="display: block;">{{ related.content | striptags | truncate(length=60) | escape }}</a>
+                <a href="/social/post/{{ related.id | escape }}" class="preview" rel="nofollow noopener noreferrer" style="display: block;" data-sinkland-link>{{ related.content | striptags | truncate(length=60) | escape }}</a>
             </span>
         </div>
         {% endfor %}

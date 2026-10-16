@@ -15,7 +15,7 @@
     <div class="poetry-grid">
         {% for entry in entries %}
         <article class="poetry-card">
-            <h2><a href="{{ entry.url | escape }}" rel="nofollow noopener noreferrer">{{ entry.title | escape }}</a></h2>
+            <h2><a href="{{ entry.url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ entry.title | escape }}</a></h2>
             <p class="poetry-preview{% if entry.form == "Haiku" %} haiku{% endif %}">{{ entry.preview | escape }}</p>
         </article>
         {% endfor %}

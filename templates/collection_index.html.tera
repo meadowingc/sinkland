@@ -46,7 +46,7 @@
     <div class="collection-grid">
         {% for entry in entries %}
         <article class="collection-card">
-            <h2><a href="{{ entry.url | escape }}" rel="nofollow noopener noreferrer">{{ entry.title | escape }}</a></h2>
+            <h2><a href="{{ entry.url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ entry.title | escape }}</a></h2>
             <p class="collection-preview{% if is_haiku %} haiku{% endif %}">{% if is_haiku %}{{ entry.excerpt | escape }}{% else %}{{ entry.excerpt | truncate(length=180) | escape }}{% endif %}</p>
         </article>
         {% endfor %}

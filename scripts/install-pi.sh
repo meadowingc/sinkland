@@ -309,7 +309,7 @@ PY
     install -m 755 "$cloudflared_source" "$INSTALL_ROOT/bin/cloudflared.next"
     mv -Tf "$INSTALL_ROOT/bin/cloudflared.next" "$cloudflared"
     if [[ ! -f "$CONFIG_DIR/sinkland.env" ]]; then
-        printf 'SINKLAND_FRIENDS=[]\n' > "$CONFIG_DIR/sinkland.env"
+        printf 'SINKLAND_FRIENDS=[]\nSINKLAND_ORIGINS=[]\n' > "$CONFIG_DIR/sinkland.env"
     fi
     chmod 600 "$CONFIG_DIR/sinkland.env"
     if [[ -n $token ]]; then

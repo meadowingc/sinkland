@@ -110,6 +110,7 @@ jobs:
             curl --fail --silent --show-error "http://127.0.0.1:43796/$path" > /dev/null
           done
           python3 ../scripts/smoke-papers.py
+          python3 ../scripts/smoke-origins.py --binary ./sinkland
       - name: Publish release
         run: |
           (cd dist && sha256sum sinkland-linux-arm64.tar.gz > sinkland-linux-arm64.tar.gz.sha256)

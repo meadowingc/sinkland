@@ -161,10 +161,15 @@ class InstallerTests(unittest.TestCase):
         )
         self.assertEqual((self.config / "tunnel-token").read_text(), TOKEN)
         self.assertEqual((self.config / "tunnel-token").stat().st_mode & 0o777, 0o600)
-        (self.config / "sinkland.env").write_text('SINKLAND_FRIENDS=["https://example.org"]\n')
+        self.assertIn("SINKLAND_ORIGINS=[]", (self.config / "sinkland.env").read_text())
+        (self.config / "sinkland.env").write_text(
+            'SINKLAND_FRIENDS=["https://example.org"]\n'
+            'SINKLAND_ORIGINS=\'["https://trap.example.org","https://pond.example.org"]\'\n'
+        )
         self.run_installer()
         self.assertEqual((self.config / "hostname").read_text(), "trap.example.org\n")
         self.assertIn("https://example.org", (self.config / "sinkland.env").read_text())
+        self.assertIn("https://pond.example.org", (self.config / "sinkland.env").read_text())
         self.assertEqual(len(list((self.install_root / "releases").iterdir())), 1)
         for name in ("sinkland", "sinkland-cloudflared"):
             unit = (self.units / f"{name}.service").read_text()

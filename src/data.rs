@@ -21,7 +21,7 @@ const BLOG_VERB_WORDS: &[&str] = &[
 ];
 
 // Load .env file on first access
-static ENV_LOADED: Lazy<()> = Lazy::new(|| {
+pub(crate) static ENV_LOADED: Lazy<()> = Lazy::new(|| {
     let _ = dotenvy::dotenv();
 });
 

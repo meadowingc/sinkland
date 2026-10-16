@@ -44,6 +44,17 @@ installed cloudflared through mise, pass `--cloudflared "$(mise which cloudflare
 when running the installer.
 See `bash scripts/install-pi.sh --help` for the other options.
 
+## Multiple site origins
+
+Set `SINKLAND_ORIGINS` to a JSON array of HTTPS origins that all serve this
+same Sinkland instance. For example, **after configuring these hostnames**:
+
+```dotenv
+SINKLAND_ORIGINS='["https://sink.meadow.cafe","https://archive.meadow.cafe","https://pond.ducks.quest"]'
+```
+
+Set it in `.env`.
+
 ## Traffic protection
 
 Sinkland limits all clients, not just crawler User-Agents. Requests must pass

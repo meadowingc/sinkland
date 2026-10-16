@@ -14,13 +14,13 @@
     <p class="blog-meta">{{ kind | escape }} · {{ reading_minutes }} min read</p>
     {% if tagged_thread %}
     <nav aria-label="Related thread">
-        <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow">#{{ tagged_thread.tag_label | escape }}</a>
-        · <a href="{{ tagged_thread.paper_url | escape }}" rel="nofollow">{{ tagged_thread.paper_title | escape }}</a>
-        · <a href="{{ tagged_thread.social_post_url | escape }}" rel="nofollow">Post by @{{ tagged_thread.social_username | escape }}</a>
+        <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow" data-sinkland-link>#{{ tagged_thread.tag_label | escape }}</a>
+        · <a href="{{ tagged_thread.paper_url | escape }}" rel="nofollow" data-sinkland-link>{{ tagged_thread.paper_title | escape }}</a>
+        · <a href="{{ tagged_thread.social_post_url | escape }}" rel="nofollow" data-sinkland-link>Post by @{{ tagged_thread.social_username | escape }}</a>
     </nav>
     {% else %}
     <nav aria-label="Topics">
-        Topics: {% for topic in topics %}<a href="/tags/{{ topic.slug | escape }}" rel="nofollow noopener noreferrer">#{{ topic.label | escape }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+        Topics: {% for topic in topics %}<a href="/tags/{{ topic.slug | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>#{{ topic.label | escape }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
     </nav>
     {% endif %}
     
@@ -34,7 +34,7 @@
     <section class="blog-section">
     {% if section.heading %}<h2>{{ section.heading | escape }}</h2>{% endif %}
     {% for paragraph in section.paragraphs %}
-    <p>{% for part in paragraph %}{% if not loop.first %} {% endif %}{% if part.url %}<a href="{{ part.url | escape }}" rel="nofollow noopener noreferrer">{{ part.text | escape }}</a>{{ part.trailing | escape }}{% else %}{{ part.text | escape }}{% endif %}{% endfor %}</p>
+    <p>{% for part in paragraph %}{% if not loop.first %} {% endif %}{% if part.url %}<a href="{{ part.url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ part.text | escape }}</a>{{ part.trailing | escape }}{% else %}{{ part.text | escape }}{% endif %}{% endfor %}</p>
     {% endfor %}
     </section>
     {% endfor %}
@@ -43,7 +43,7 @@
         <h2>Related Articles</h2>
         <ul>
             {% for link in links %}
-            <li><a href="{{ link.1 | escape }}" rel="nofollow noopener noreferrer">{{ link.0 | escape }}</a></li>
+            <li><a href="{{ link.1 | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ link.0 | escape }}</a></li>
             {% endfor %}
         </ul>
     </div>

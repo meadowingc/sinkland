@@ -314,7 +314,7 @@
         <div class="profile-bio">{{ user.bio | escape }}</div>
         {% if tagged_thread %}
         <nav aria-label="Related topic">
-            <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow">#{{ tagged_thread.tag_label | escape }}</a>
+            <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow" data-sinkland-link>#{{ tagged_thread.tag_label | escape }}</a>
         </nav>
         {% endif %}
         
@@ -361,21 +361,21 @@
     <article class="post-card">
         {% if active_tab == "replies" and reply_targets[loop.index0] %}
         <div class="reply-context" style="color: #657786; font-size: 0.85em; margin-bottom: 10px; padding-left: 60px;">
-            Replying to <a href="/social/user/{{ reply_targets[loop.index0].username | escape }}" style="color: #1da1f2;" rel="nofollow noopener noreferrer">@{{ reply_targets[loop.index0].username | escape }}</a>
+            Replying to <a href="/social/user/{{ reply_targets[loop.index0].username | escape }}" style="color: #1da1f2;" rel="nofollow noopener noreferrer" data-sinkland-link>@{{ reply_targets[loop.index0].username | escape }}</a>
         </div>
         {% endif %}
         
         <div class="post-header">
-            <a href="/social/user/{{ post.author.username | escape }}" rel="nofollow noopener noreferrer">
+            <a href="/social/user/{{ post.author.username | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>
                 <img src="/social/avatar/{{ post.author.username | escape }}.png" alt="Avatar for {{ post.author.display_name | escape }}" class="avatar">
             </a>
             <div class="user-info">
-                <a href="/social/user/{{ post.author.username | escape }}" class="display-name" rel="nofollow noopener noreferrer">
+                <a href="/social/user/{{ post.author.username | escape }}" class="display-name" rel="nofollow noopener noreferrer" data-sinkland-link>
                     {{ post.author.display_name | escape }}
                     {% if post.author.verified %}<span class="verified-badge" style="color: #1da1f2;">✓</span>{% endif %}
                 </a>
                 <div class="username">
-                    <a href="/social/user/{{ post.author.username | escape }}" rel="nofollow noopener noreferrer">@{{ post.author.username | escape }}</a>
+                    <a href="/social/user/{{ post.author.username | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>@{{ post.author.username | escape }}</a>
                     · <span class="post-time">{{ post.relative_time | escape }}</span>
                 </div>
             </div>
@@ -384,15 +384,15 @@
         <div class="post-content">
             {% if tagged_post_id and post.id == tagged_post_id %}
             {{ post.content | escape }}
-            <p><a href="{{ tagged_thread.blog_url | escape }}" rel="nofollow">{{ tagged_thread.blog_title | escape }}</a> · <a href="{{ tagged_thread.paper_url | escape }}" rel="nofollow">{{ tagged_thread.paper_title | escape }}</a> · <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow">#{{ tagged_thread.tag_label | escape }}</a></p>
-            <a href="{{ tagged_thread.social_post_url | escape }}" rel="nofollow">View this post</a>
+            <p><a href="{{ tagged_thread.blog_url | escape }}" rel="nofollow" data-sinkland-link>{{ tagged_thread.blog_title | escape }}</a> · <a href="{{ tagged_thread.paper_url | escape }}" rel="nofollow" data-sinkland-link>{{ tagged_thread.paper_title | escape }}</a> · <a href="{{ tagged_thread.tag_url | escape }}" rel="nofollow" data-sinkland-link>#{{ tagged_thread.tag_label | escape }}</a></p>
+            <a href="{{ tagged_thread.social_post_url | escape }}" rel="nofollow" data-sinkland-link>View this post</a>
             {% else %}
             {{ post.content | safe }}
             {% endif %}
         </div>
         
         {% if post.has_image %}
-        <a href="/social/post/{{ post.id | escape }}" rel="nofollow noopener noreferrer">
+        <a href="/social/post/{{ post.id | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>
             <img src="/social/media/{{ post.image_id | escape }}.png" alt="{{ post.image_alt | default(value='Post image') | escape }}" class="post-image">
         </a>
         {% endif %}
