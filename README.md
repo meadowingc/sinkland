@@ -14,6 +14,16 @@ traffic.
 
 ## Run it locally
 
+All supported runtime settings and their standalone defaults are listed in
+[`.env.example`](.env.example). If you don't already have a `.env`, copy the
+example and adjust it before starting:
+
+```bash
+cp .env.example .env
+```
+
+Existing environment variables take precedence over `.env`.
+
 ```bash
 cargo run
 ```
