@@ -65,6 +65,23 @@ SINKLAND_ORIGINS='["https://sink.meadow.cafe","https://archive.meadow.cafe","htt
 
 Set it in `.env`.
 
+## Research papers
+
+Paper bodies combine six layout strategies with eighteen analytical
+perspectives, including location, dispersion, quartiles, distribution overlap,
+observation windows, rankings, endpoint removal, mean intervals, sequence
+crossings, detrending, roughness and single-observation influence. A paper does
+not repeat the same perspective for every experiment. Introductions, methods,
+interpretation and limitations use independently seeded alternatives, while
+cross-setting synthesis appears once and follows the observed rankings.
+
+The interpretation follows the observations: ranking reversals, intersecting
+intervals, changes between windows and other statements are calculated from the
+same sequences shown in the tables and figures. These descriptive checks do not
+claim statistical significance or real-world effects. Existing paper IDs,
+authors, citations and experimental data are preserved; article bodies can
+evolve when the generator is updated.
+
 ## Daily news
 
 `/news` opens **Sinkland Daily**, with dated editions from `2000-01-01` through
@@ -72,14 +89,18 @@ today (UTC). Eight desks cover city life, science, technology, business, culture
 environment, sport, and transport. Each date has 24 stories per desk, browsable
 in pages of 12. Previous/next-day links preserve the selected desk.
 
-Articles use 40 topic-specific reporting scenarios, six developments and six
-formats: reports, explainers, on-the-ground dispatches, interviews, data
-briefings, and timelines. Locations, people, decisions and activity records are
-generated locally from the date, topic and story number. A story's title,
-preview, text and figures agree across listings and repeat visits. Bar and line
-graphics include accessible data tables; their numbers come from the same
-records as the article. There are no external news feeds, API calls, JavaScript
-requirements, or additional runtime assets.
+Articles draw on 40 topic-specific event families, 80 outcomes, 120 event angles
+and 64 desk-specific reporting perspectives. Six layouts combine event accounts,
+context, follow-ups and optional quotation exchanges, rather than giving every
+story the same progression. Stories about the same event family can develop
+different consequences, constraints and questions.
+
+Locations, people, decisions and evidence are generated locally from the date,
+topic and story number. A story's title, preview, text and any figures agree
+across listings and repeat visits. Graphics appear only where an event has
+numerical evidence, with accessible data tables drawn from the same records as
+the article, rather than a mandatory activity chart. There are no external news
+feeds, API calls, JavaScript requirements, or additional runtime assets.
 
 For example, `/news/2024-02-29/science/0` is a stable article;
 `/news/2024-02-29/science?page=1` is its desk's second page. Future or invalid

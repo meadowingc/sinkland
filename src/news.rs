@@ -301,16 +301,35 @@ mod tests {
                 let body = html_escape::decode_html_entities(&body);
                 assert!(body.contains(&expected.summary.title));
                 assert!(body.contains(&expected.summary.preview));
-                assert!(body.contains("<svg"));
-                assert!(body.contains("news-chart-title"));
-                assert!(body.contains("class=\"news-data\""));
+                assert_eq!(body.contains("<svg"), expected.graphic.is_some());
+                assert_eq!(
+                    body.contains("news-chart-title"),
+                    expected.graphic.is_some()
+                );
+                assert_eq!(
+                    body.contains("class=\"news-data\""),
+                    expected.graphic.is_some()
+                );
                 assert!(body.contains("More from this desk"));
                 assert!(body.contains("noindex, nofollow, noarchive, nosnippet"));
                 assert!(!body.contains("data-sinkland-link"));
                 assert!(!body.contains("fake news"));
                 assert!(!body.contains("<script"));
-                for point in &expected.graphic.observations {
-                    assert!(body.contains(&format!("<td>{}</td>", point.value)));
+                assert!(body.contains(&format!(">{}</a>", expected.summary.byline)));
+                assert!(body.contains(&expected.summary.reporter_url));
+                if let Some(graphic) = &expected.graphic {
+                    assert!(body.contains(&graphic.description));
+                    assert!(body.contains(&graphic.caption));
+                    for point in &graphic.observations {
+                        assert!(body.contains(&format!("<td>{}</td>", point.value)));
+                        assert!(body.contains(&format!("<th scope=\"row\">{}</th>", point.label)));
+                    }
+                }
+                for related in generator::related(id) {
+                    assert!(body.contains(&related.title));
+                    assert!(body.contains(&related.preview));
+                    assert!(body.contains(&related.byline));
+                    assert!(body.contains(&related.reporter_url));
                 }
             }
         }

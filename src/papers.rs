@@ -243,8 +243,12 @@ mod tests {
     use crate::get_visit_counts;
     use poem::{Endpoint, Request, http::Uri};
 
+    // Route tests share the paper-visit counter inspected below.
+    static ROUTE_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     #[tokio::test]
     async fn discovery_routes_render_abstract_previews() {
+        let _guard = ROUTE_TEST_LOCK.lock().await;
         let app = routes();
         for path in [
             "/?seed=000000000000002a",
@@ -272,7 +276,65 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn varied_paper_outlines_keep_contents_figures_and_references_linked() {
+        let _guard = ROUTE_TEST_LOCK.lock().await;
+        let app = routes();
+        for nonce in 0..8 {
+            let id = PaperId {
+                category: nonce as usize,
+                author: 12,
+                topic: nonce as usize % 6,
+                nonce,
+            };
+            let expected = generator::generate(&id);
+            let response = app
+                .get_response(
+                    Request::builder()
+                        .uri(format!("/p/{id}").parse::<Uri>().unwrap())
+                        .finish(),
+                )
+                .await;
+            assert_eq!(response.status(), StatusCode::OK);
+            let body = response.into_body().into_string().await.unwrap();
+            let body = body.replace("&#x2F;", "/");
+            for section in &expected.sections {
+                assert_eq!(
+                    body.matches(&format!("id=\"{}\"", section.anchor)).count(),
+                    1,
+                    "{id}: {}",
+                    section.anchor
+                );
+                assert_eq!(
+                    body.matches(&format!("href=\"#{}\"", section.anchor))
+                        .count(),
+                    usize::from(section.level == 2),
+                    "{id}: contents entry"
+                );
+                if let Some(paper_figure) = &section.figure {
+                    assert_eq!(
+                        body.matches(&format!(
+                            "src=\"/papers/p/{id}/figures/{}\"",
+                            paper_figure.index
+                        ))
+                        .count(),
+                        1
+                    );
+                }
+            }
+            assert_eq!(
+                body.matches("<table>").count(),
+                generator::figure_count(&id) * 2
+            );
+            assert_eq!(body.matches("Cross-setting comparison</h2>").count(), 1);
+            for reference in expected.references.iter().chain(&expected.related) {
+                assert!(body.contains(&format!("href=\"/papers/p/{}\"", reference.id)));
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn pages_and_figures_validate_inputs() {
+        let _guard = ROUTE_TEST_LOCK.lock().await;
         let app = routes();
         for path in [
             "/",
@@ -382,6 +444,7 @@ mod tests {
     async fn only_exact_tagged_paper_ids_show_their_thread_links() {
         use crate::generators::tags::{Tag, ThreadKey};
 
+        let _guard = ROUTE_TEST_LOCK.lock().await;
         let key = ThreadKey::new(Tag::MissingRecords, 42);
         let links = key.links();
         let app = routes();

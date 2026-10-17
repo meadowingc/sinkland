@@ -1,4 +1,5 @@
 pub mod charts;
+mod narrative;
 
 use rand::{Rng, SeedableRng, seq::SliceRandom};
 use rand_chacha::ChaCha8Rng;
@@ -1180,123 +1181,6 @@ fn archetype(id: &PaperId) -> Archetype {
     }
 }
 
-fn observation_summary(data: &Experiment) -> String {
-    let total = data
-        .series
-        .iter()
-        .map(|series| series.summary.n)
-        .sum::<usize>();
-    let leader = data
-        .series
-        .iter()
-        .max_by(|a, b| a.summary.mean.total_cmp(&b.summary.mean))
-        .unwrap();
-    let lower = data
-        .series
-        .iter()
-        .min_by(|a, b| a.summary.mean.total_cmp(&b.summary.mean))
-        .unwrap();
-    format!(
-        "The {} compares {} configurations over {total} measurements ({} per configuration). \
-         The largest observed mean is {:.2} {} for {}, versus {:.2} for {}; \
-         the measured difference is {:.2} {}. These are descriptive comparisons, not a test of significance.",
-        data.context,
-        data.series.len(),
-        data.series[0].summary.n,
-        leader.summary.mean,
-        data.unit,
-        leader.name,
-        lower.summary.mean,
-        lower.name,
-        leader.summary.mean - lower.summary.mean,
-        data.unit
-    )
-}
-
-fn result_paragraphs(data: &Experiment, style: Archetype) -> Vec<String> {
-    let first = &data.series[0];
-    let last = data.series.last().unwrap();
-    let widest = data
-        .series
-        .iter()
-        .max_by(|a, b| a.summary.sd.total_cmp(&b.summary.sd))
-        .unwrap();
-    let narrowest = data
-        .series
-        .iter()
-        .min_by(|a, b| a.summary.sd.total_cmp(&b.summary.sd))
-        .unwrap();
-    let mode = match style {
-        Archetype::Comparative => format!(
-            "For {} the mean of {} is {:.2} {}, while {} averages {:.2}. \
-             Their respective interquartile ranges are {:.2}–{:.2} and {:.2}–{:.2}; \
-             the difference in means is {:.2} in the order reported here. \
-             The figure and accompanying tables use these same observation series.",
-            data.context,
-            first.name,
-            first.summary.mean,
-            data.unit,
-            last.name,
-            last.summary.mean,
-            first.summary.q1,
-            first.summary.q3,
-            last.summary.q1,
-            last.summary.q3,
-            first.summary.mean - last.summary.mean
-        ),
-        Archetype::Methods => format!(
-            "Under {} the {} configuration returns a mean of {:.2} {} with sample SD {:.2}. \
-             By contrast, {} returns {:.2} with sample SD {:.2}. \
-             This comparison describes both response level and dispersion without assuming \
-             that either configuration generalizes to measurements outside this evaluation.",
-            data.context,
-            first.name,
-            first.summary.mean,
-            data.unit,
-            first.summary.sd,
-            last.name,
-            last.summary.mean,
-            last.summary.sd
-        ),
-        Archetype::Observational => format!(
-            "During {} the observed values for {} extend from {:.2} to {:.2} {}, \
-             with median {:.2}; for {}, they extend from {:.2} to {:.2}, \
-             with median {:.2}. The full distributions, rather than a single summary, \
-             are relevant when comparing these configurations.",
-            data.context,
-            first.name,
-            first.summary.min,
-            first.summary.max,
-            data.unit,
-            first.summary.median,
-            last.name,
-            last.summary.min,
-            last.summary.max,
-            last.summary.median
-        ),
-    };
-    vec![
-        observation_summary(data),
-        mode,
-        format!(
-            "Variation is greatest for {} (sample SD {:.2} {}) and smallest for {} \
-             (sample SD {:.2}). Their illustrative mean intervals are {:.2}–{:.2} and \
-             {:.2}–{:.2}, respectively. Because the measurements are generated as a \
-             sequence, these intervals should not be read as calibrated confidence \
-             statements about an external population.",
-            widest.name,
-            widest.summary.sd,
-            data.unit,
-            narrowest.name,
-            narrowest.summary.sd,
-            widest.summary.low,
-            widest.summary.high,
-            narrowest.summary.low,
-            narrowest.summary.high
-        ),
-    ]
-}
-
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Paper {
     pub metadata: Metadata,
@@ -1429,293 +1313,12 @@ pub fn generate(id: &PaperId) -> Paper {
     let metadata = metadata(id);
     let style = archetype(id);
     let count = figure_count(id);
-    let first = experiment(id, 0);
-    let last = experiment(id, count - 1);
-    let labels = first
-        .series
-        .iter()
-        .map(|series| series.name.as_str())
-        .collect::<Vec<_>>()
-        .join(", ");
-    let (opening, setup, analysis, findings, discussion, closing) = match style {
-        Archetype::Comparative => (
-            "Introduction",
-            "Study design",
-            "Evaluation protocol",
-            "Comparative results",
-            "Discussion",
-            "Conclusion",
-        ),
-        Archetype::Methods => (
-            "Background and objectives",
-            "Model construction",
-            "Benchmark protocol",
-            "Benchmark results",
-            "Methodological limitations",
-            "Concluding remarks",
-        ),
-        Archetype::Observational => (
-            "Research context",
-            "Sampling framework",
-            "Measurement strategy",
-            "Observed patterns",
-            "Interpretation",
-            "Outlook",
-        ),
-    };
-    let mut sections = Vec::new();
-    let mut introduction = vec![
-        format!(
-            "The behavior of {} remains difficult to characterize when observations vary \
-             between configurations and operating conditions. This paper examines {count} \
-             evaluation settings, asking how measured response and dispersion change \
-             across a fixed set of alternatives. Reporting both central tendencies and \
-             the underlying ranges avoids treating one favorable measurement as a complete result.",
-            metadata.topic
-        ),
-        format!(
-            "The comparison includes {labels}. Their labels refer to alternative \
-             configurations of the same modeled subject; each is observed on an equal \
-             number of steps within a setting. The study emphasizes repeatable descriptive \
-             summaries rather than claims of causal effects or universal performance.",
-        ),
-    ];
-    introduction.push(TOPIC_FRAMES[id.category][id.topic].premise.to_owned());
-    add_section(&mut sections, 2, opening, introduction, vec![], None);
-    let mut study_design = vec![
-        format!(
-            "Each setting produces a sequence of {} to {} measurements per configuration. \
-             The first setting, {}, contains {} observations per configuration; \
-             the final setting, {}, contains {}. Distinct settings use separately generated \
-             observation sequences while preserving the configuration names throughout the paper.",
-            (0..count)
-                .map(|index| experiment(id, index).series[0].summary.n)
-                .min()
-                .unwrap(),
-            (0..count)
-                .map(|index| experiment(id, index).series[0].summary.n)
-                .max()
-                .unwrap(),
-            first.context,
-            first.series[0].summary.n,
-            last.context,
-            last.series[0].summary.n
-        ),
-        format!(
-            "For {} we record a value at each observation step and calculate \
-             the arithmetic mean, sample standard deviation, minimum, maximum, \
-             and linearly interpolated quartiles. All tables and charts are rendered \
-             from those same recorded values; a change in plotting style does not \
-             change the underlying measurements.",
-            metadata.topic
-        ),
-    ];
-    study_design.push(TOPIC_FRAMES[id.category][id.topic].protocol.to_owned());
-    add_section(&mut sections, 2, setup, study_design, vec![], None);
-    add_section(
-        &mut sections,
-        2,
-        analysis,
-        vec![
-        format!(
-            "The evaluation varies the operating context while maintaining a common \
-             within-setting measurement protocol. We compare configurations within each \
-             setting rather than pooling values expressed in potentially different units. \
-             For example, the first setting reports {}, whereas the last reports {}.",
-            first.unit, last.unit
-        ),
-        "Reported mean intervals use the illustrative expression mean ± 1.96 × sample SD / √n. \
-         Serial dependence and the generated nature of these series mean that the intervals \
-         do not provide calibrated inference about an external population. Differences \
-         between configurations are reported in the units of each setting.".to_owned(),
-    ],
-        vec![],
-        None,
-    );
-    if style == Archetype::Methods {
-        add_section(
-            &mut sections,
-            2,
-            "Implementation details",
-            vec![
-                format!(
-                    "The configurations are represented consistently in every benchmark \
-                     by the labels {labels}. Within each setting, the observation sequence \
-                     has the same length for all configurations, which permits direct \
-                     descriptive comparisons of their means and spreads without \
-                     reconciling unequal sample sizes."
-                ),
-                format!(
-                    "We retain individual measurements rather than generating \
-                     independent figures from fitted summaries. This design lets the \
-                     distribution plots, time-indexed views, and two tables for each \
-                     experiment describe the same {}-step or longer sequence.",
-                    first.series[0].summary.n
-                ),
-            ],
-            vec![],
-            None,
-        );
-    }
-    let split = if style == Archetype::Comparative {
-        count
-    } else {
-        (count + 1) / 2
-    };
-    add_section(
-        &mut sections,
-        2,
-        findings,
-        vec![format!(
-            "The following {count} settings compare the same {} configurations \
-             under different observation conditions. Each subsection reports \
-             distributional summaries alongside a figure, making changes in \
-             location and variability visible without reducing the results to a \
-             single ranking.",
-            first.series.len()
-        )],
-        vec![],
-        None,
-    );
-    for index in 0..count {
-        if index == split {
-            let (heading, description) = if style == Archetype::Methods {
-                ("Sensitivity and ablation", "initial benchmarks")
-            } else {
-                ("Distributional checks", "earlier observations")
-            };
-            add_section(
-                &mut sections,
-                2,
-                heading,
-                vec![format!(
-                    "The remaining {} settings examine whether the ordering and spread \
-                     observed in the {description} persist when evaluation conditions \
-                     change. These checks use the same named configurations but independent \
-                     measurements, so differences between sections should be interpreted \
-                     descriptively rather than as paired estimates.",
-                    count - split
-                )],
-                vec![],
-                None,
-            );
-        }
-        if style == Archetype::Comparative && rng(&format!("{id}:comparison-check")).gen_bool(0.5) {
-            add_section(
-                &mut sections,
-                2,
-                "Cross-setting comparison",
-                vec![
-                    format!(
-                        "The first evaluation uses {} for {} recorded steps per configuration. \
-                         The final evaluation uses {} for {} steps. A comparison of their \
-                         raw means would mix distinct settings{}; the within-setting \
-                         configuration differences are therefore the primary reported \
-                         contrasts.",
-                        first.unit,
-                        first.series[0].summary.n,
-                        last.unit,
-                        last.series[0].summary.n,
-                        if first.unit == last.unit {
-                            ""
-                        } else {
-                            " and measurement units"
-                        }
-                    ),
-                    format!(
-                        "For {}, the first-setting interquartile range is {:.2}–{:.2}, \
-                         while the final-setting range is {:.2}–{:.2}. The comparison \
-                         illustrates the variation in recorded responses without \
-                         assuming that the underlying conditions are interchangeable.",
-                        first.series[0].name,
-                        first.series[0].summary.q1,
-                        first.series[0].summary.q3,
-                        last.series[0].summary.q1,
-                        last.series[0].summary.q3
-                    ),
-                ],
-                vec![],
-                None,
-            );
-        }
-        let data = experiment(id, index);
-        add_section(
-            &mut sections,
-            3,
-            format!("{} ({})", capitalize_title(&data.context), data.unit),
-            result_paragraphs(&data, style),
-            tables(&data),
-            Some(figure(id, index)),
-        );
-    }
-    let mut interpretation = vec![
-        format!(
-            "Across the reported settings, the analysis of {} shows why \
-             configuration-level comparisons require attention to both level and \
-             variability. In the opening setting the mean for {} is {:.2} {}, \
-             while the final setting reports {:.2} {} for the same configuration. \
-             Because the units and observation contexts can differ, these two \
-             numbers should not be subtracted to infer a cross-setting effect.",
-            metadata.topic,
-            first.series[0].name,
-            first.series[0].summary.mean,
-            first.unit,
-            last.series[0].summary.mean,
-            last.unit
-        ),
-        format!(
-            "The {} includes {} measurements per configuration; the {} includes {}. \
-             A higher or lower average within either setting describes that sample \
-             only. Changes in the generating conditions, limited sample size, and \
-             dependence between neighboring observations constrain any broader \
-             interpretation of the figures and tabulated intervals.",
-            first.context, first.series[0].summary.n, last.context, last.series[0].summary.n
-        ),
-    ];
-    interpretation.push(TOPIC_FRAMES[id.category][id.topic].reading.to_owned());
-    add_section(&mut sections, 2, discussion, interpretation, vec![], None);
-    if rng(&format!("{id}:limitations")).gen_bool(0.5) {
-        add_section(
-            &mut sections,
-            2,
-            "Scope and limitations",
-            vec![
-                format!(
-                    "The analysis is restricted to {count} settings and {} modeled \
-                 configurations. A richer design could vary the length of the \
-                 observation window, add independent replications, and compare \
-                 alternative sampling assumptions. None of the descriptive \
-                 differences here establishes a causal mechanism for {}.",
-                    first.series.len(),
-                    metadata.topic
-                ),
-                "The normal-approximation intervals and visual summaries are useful for \
-             exploring these generated series but cannot substitute for validation \
-             on external measurements. In particular, temporal correlations and \
-             changes in measurement units across settings require care before \
-             comparing aggregate estimates."
-                    .to_owned(),
-            ],
-            vec![],
-            None,
-        );
-    }
-    add_section(
-        &mut sections,
-        2,
-        closing,
-        vec![format!(
-            "This study provides a reproducible descriptive view of {} across \
-             {count} settings. The relative positions of configurations can be \
-             examined alongside their dispersion and quantiles, and each result \
-             is traceable to the corresponding observation series. Follow-up work \
-             could test whether the reported patterns persist under additional \
-             configurations and independently generated measurements.",
-            metadata.topic
-        )],
-        vec![],
-        None,
-    );
+    let data = (0..count)
+        .map(|index| experiment(id, index))
+        .collect::<Vec<_>>();
+    let first = &data[0];
+    let last = &data[count - 1];
+    let sections = narrative::sections(id, &metadata, &data, style);
     let mut ref_rng = rng(&format!("{id}:references"));
     let mut seen = BTreeSet::from([id.to_string()]);
     let mut references = Vec::new();
@@ -1741,7 +1344,7 @@ pub fn generate(id: &PaperId) -> Paper {
     .take(4)
     .collect();
     Paper {
-        abstract_text: paper_abstract(id, &metadata, style, count, &first, &last),
+        abstract_text: paper_abstract(id, &metadata, style, count, first, last),
         metadata,
         sections,
         references,
@@ -1883,7 +1486,8 @@ mod tests {
                     assert!(
                         paper.sections[0]
                             .paragraphs
-                            .contains(&frame.premise.to_owned())
+                            .iter()
+                            .any(|paragraph| paragraph.contains(frame.premise))
                     );
                     assert!(
                         paper.sections[1]
@@ -1894,7 +1498,8 @@ mod tests {
                         paper
                             .sections
                             .iter()
-                            .any(|section| section.paragraphs.contains(&frame.reading.to_owned()))
+                            .flat_map(|section| &section.paragraphs)
+                            .any(|paragraph| paragraph.contains(frame.reading))
                     );
                     assert_eq!(paper, generate(&id));
                     assert_eq!(
@@ -1988,6 +1593,32 @@ mod tests {
             assert_eq!(result, metadata(&result.id.parse().unwrap()));
         }
         assert_eq!(generate(&original), generate(&original));
+    }
+
+    #[test]
+    fn narrative_domains_preserve_existing_data_identity_and_preview_seeds() {
+        // Archive-visible precision avoids platform-specific last bits in sin().
+        let mut hash = 5381_u64;
+        for sample in 0..8 {
+            let id = PaperId {
+                category: sample,
+                topic: 0,
+                author: 12,
+                nonce: sample as u64,
+            };
+            let metadata = metadata(&id);
+            let observations = (0..figure_count(&id))
+                .map(|index| tables(&experiment(&id, index)))
+                .collect::<Vec<_>>();
+            let figures = (0..figure_count(&id))
+                .map(|index| figure(&id, index))
+                .collect::<Vec<_>>();
+            let preview = abstract_preview(&metadata).unwrap();
+            for byte in serde_json::to_vec(&(metadata, observations, figures, preview)).unwrap() {
+                hash = hash.wrapping_mul(33).wrapping_add(u64::from(byte));
+            }
+        }
+        assert_eq!(hash, 0x61c1_ea99_66b4_5172);
     }
 
     #[test]
@@ -2163,17 +1794,17 @@ mod tests {
                     indices.push(figure.index);
                     let data = experiment(&id, figure.index);
                     assert_eq!(section.tables, tables(&data));
-                    let largest_mean = data
-                        .series
-                        .iter()
-                        .map(|series| series.summary.mean)
-                        .max_by(f64::total_cmp)
-                        .unwrap();
+                    let prose = section.paragraphs.join(" ");
+                    assert!(prose.contains(&data.unit));
                     assert!(
-                        section
-                            .paragraphs
-                            .join(" ")
-                            .contains(&format!("{largest_mean:.2}"))
+                        data.series
+                            .iter()
+                            .any(|series| prose.contains(&series.name))
+                    );
+                    assert_eq!(section.paragraphs.len(), 2, "Evidence and interpretation");
+                    assert!(
+                        prose.split_whitespace().count() >= 40,
+                        "Substantive setting analysis"
                     );
                 } else {
                     assert!(section.tables.is_empty());
@@ -2203,8 +1834,8 @@ mod tests {
         let two = lengths_by_count.get(&2).unwrap();
         let ten = lengths_by_count.get(&10).unwrap();
         assert!(
-            ten.iter().sum::<usize>() / ten.len() > two.iter().sum::<usize>() / two.len() + 600,
-            "Longer papers must contain substantially more prose"
+            ten.iter().sum::<usize>() / ten.len() > two.iter().sum::<usize>() / two.len() + 450,
+            "Additional settings must add substantial analysis, without repeated scope disclaimers"
         );
     }
 

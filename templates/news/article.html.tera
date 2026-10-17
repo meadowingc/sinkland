@@ -10,31 +10,26 @@
         <p class="news-meta">By <a href="{{ article.summary.reporter_url | escape }}" rel="author nofollow noopener noreferrer" data-sinkland-link>{{ article.summary.byline | escape }}</a> &middot; {{ article.summary.location | escape }} &middot; <time datetime="{{ date }}">{{ date }}</time></p>
         <p class="news-lead">{{ article.summary.preview | escape }}</p>
     </header>
-    <ul class="news-highlights" aria-label="At a glance">
+    {% if article.highlights %}<ul class="news-highlights" aria-label="At a glance">
         {% for fact in article.highlights %}<li>{{ fact | escape }}</li>{% endfor %}
-    </ul>
+    </ul>{% endif %}
     {% for section in article.sections %}
     <section class="news-section">
         <h2>{{ section.heading | escape }}</h2>
         {% for paragraph in section.paragraphs %}<p>{{ paragraph | escape }}</p>{% endfor %}
     </section>
-    {% if loop.first %}
+    {% if loop.first and article.graphic %}
     <figure class="news-graphic">
         <h2>{{ article.graphic.title | escape }}</h2>
         <svg viewBox="0 0 660 280" role="img" aria-labelledby="news-chart-title news-chart-description">
             <title id="news-chart-title">{{ article.graphic.title | escape }}</title>
-            <desc id="news-chart-description">Activity counts over six equal reporting windows. Exact values are labelled and available in the data table below.</desc>
+            <desc id="news-chart-description">{{ article.graphic.description | escape }}</desc>
             <line x1="35" y1="230" x2="625" y2="230" stroke="#80989c"/>
             <text x="20" y="234" text-anchor="end">0</text>
-            {% if article.graphic.line %}<polyline points="{{ article.graphic.points | escape }}" fill="none" stroke="#286675" stroke-width="3"/>{% endif %}
             {% for point in article.graphic.observations %}
-                {% if article.graphic.line %}
-                <circle cx="{{ point.x }}" cy="{{ point.y }}" r="5" fill="#286675"/>
-                {% else %}
                 <rect x="{{ point.x - 26 }}" y="{{ point.y }}" width="52" height="{{ point.height }}" rx="3" fill="#286675"/>
-                {% endif %}
                 <text x="{{ point.x }}" y="{{ point.y - 13 }}" text-anchor="middle" fill="#253f46">{{ point.value }}</text>
-                <text x="{{ point.x }}" y="255" text-anchor="middle" fill="#52666c">{{ point.date | date(format="%b %d") }}</text>
+                <text x="{{ point.x }}" y="255" text-anchor="middle" fill="#52666c">{{ point.label | escape }}</text>
             {% endfor %}
         </svg>
         <figcaption>{{ article.graphic.caption | escape }}</figcaption>
@@ -42,10 +37,10 @@
             <summary>View the data</summary>
             <table>
                 <caption>{{ article.graphic.title | escape }}</caption>
-                <thead><tr><th scope="col">Window ending</th><th scope="col">{{ article.graphic.measure | escape }}</th></tr></thead>
+                <thead><tr><th scope="col">Category</th><th scope="col">{{ article.graphic.measure | escape }}</th></tr></thead>
                 <tbody>
                     {% for point in article.graphic.observations %}
-                    <tr><th scope="row">{{ point.date }}</th><td>{{ point.value }}</td></tr>
+                    <tr><th scope="row">{{ point.label | escape }}</th><td>{{ point.value }}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -61,6 +56,7 @@
     <article class="news-card">
         <span class="news-kicker">{{ story.format | escape }}</span>
         <h2><a href="{{ story.url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ story.title | escape }}</a></h2>
+        <p class="news-meta">By <a href="{{ story.reporter_url | escape }}" rel="author nofollow noopener noreferrer" data-sinkland-link>{{ story.byline | escape }}</a></p>
         <p class="news-preview">{{ story.preview | escape }}</p>
     </article>
     {% endfor %}
