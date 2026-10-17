@@ -1,0 +1,65 @@
+{% extends "base.html.tera" %}
+
+{% block extra_styles %}
+    .content { max-width: 1100px; }
+    .news-masthead { border-top: 5px solid #253f46; border-bottom: 1px solid #b9c6c8; padding: 18px 0; text-align: center; }
+    .news-masthead a { color: #253f46; font-size: 2.4em; font-weight: bold; text-decoration: none; }
+    .news-masthead p { margin: 6px 0 0; text-align: center; color: #52666c; }
+    .news-nav, .news-pagination, .news-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin: 20px 0; }
+    .news-nav a, .news-pagination a, .news-dates a, .news-card a, .news-breadcrumb a { color: #205c6b; }
+    .news-nav a[aria-current="page"] { font-weight: bold; text-decoration-thickness: 3px; }
+    .news-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+    .news-card { border-top: 3px solid #7f9d9f; padding: 15px 0; }
+    .news-card h2 { margin: 8px 0 12px; line-height: 1.3; }
+    .news-card h2 a { text-decoration: none; }
+    .news-card h2 a:hover { text-decoration: underline; }
+    .news-card p { text-align: left; }
+    .news-kicker, .news-meta { font-family: system-ui, sans-serif; font-size: .82em; color: #52666c; }
+    .news-meta a { color: inherit; text-underline-offset: 2px; }
+    .news-kicker { text-transform: uppercase; letter-spacing: .07em; }
+    .news-preview { font-size: .95em; line-height: 1.65; }
+    .news-story { max-width: 800px; margin: 30px auto; }
+    .news-story h1 { font-size: 2.2em; line-height: 1.2; border: 0; padding: 0; margin: 12px 0 20px; }
+    .news-lead { font-size: 1.2em; color: #3c555e; }
+    .news-story p { text-align: left; line-height: 1.75; }
+    .news-highlights { padding: 20px 20px 20px 40px; margin: 25px 0; background: #eff5f4; border-left: 4px solid #527c80; }
+    .news-highlights li { margin: 5px 0; }
+    .news-section { margin-top: 30px; }
+    .news-graphic { margin: 32px 0; padding: 20px; background: #f4f7f7; border: 1px solid #d4dfe0; }
+    .news-graphic svg { display: block; width: 100%; height: auto; font-family: system-ui, sans-serif; font-size: 12px; }
+    .news-graphic figcaption { color: #52666c; font-size: .9em; }
+    .news-data { margin: 18px 0; overflow-x: auto; }
+    .news-data summary { cursor: pointer; color: #205c6b; }
+    .news-data table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; margin: 10px 0; }
+    .news-data th, .news-data td { text-align: right; padding: 8px 12px; border-bottom: 1px solid #d4dfe0; }
+    .news-data th:first-child, .news-data td:first-child { text-align: left; }
+    .news-data caption { text-align: left; }
+    @media (max-width: 850px) { .news-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) {
+        .news-grid { grid-template-columns: 1fr; gap: 12px; }
+        .news-story h1 { font-size: 1.7em; }
+        .news-masthead a { font-size: 2em; }
+        .news-graphic { padding: 10px; }
+    }
+{% endblock extra_styles %}
+
+{% block content %}
+<header class="news-masthead">
+    <a href="/news" rel="nofollow">Sinkland Daily</a>
+    <p>{% if reporter_name %}Reporter archive{% else %}<time datetime="{{ date }}">{{ date_label | escape }}</time> &middot; Daily edition &middot; UTC{% endif %}</p>
+</header>
+<nav class="news-nav" aria-label="News topics">
+    <a href="/news/{{ date }}" rel="nofollow"{% if not selected_topic %} aria-current="page"{% endif %}>All desks</a>
+    {% for topic in topics %}
+    <a href="/news/{{ date }}/{{ topic.0 }}" rel="nofollow"{% if selected_topic == topic.0 %} aria-current="page"{% endif %}>{{ topic.1 | escape }}</a>
+    {% endfor %}
+</nav>
+{% if not reporter_name %}
+<nav class="news-dates" aria-label="Daily editions">
+    {% if previous_date_url %}<a href="{{ previous_date_url | escape }}" rel="nofollow">Previous day</a>{% endif %}
+    <a href="/news" rel="nofollow">Today's edition</a>
+    {% if next_date_url %}<a href="{{ next_date_url | escape }}" rel="nofollow">Next day</a>{% endif %}
+</nav>
+{% endif %}
+{% block news_content %}{% endblock news_content %}
+{% endblock content %}

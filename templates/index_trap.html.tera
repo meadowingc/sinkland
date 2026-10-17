@@ -45,6 +45,16 @@
         </ul>
     </div>
 
+    <div class="links">
+        <h2>Today's News</h2>
+        <p><a href="/news" rel="nofollow noopener noreferrer">Read Sinkland Daily</a>.</p>
+        <ul>
+            {% for story in news_links %}
+            <li><a href="{{ story.url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ story.title | escape }}</a><p class="featured-preview">{{ story.preview | truncate(length=180) | escape }}</p></li>
+            {% endfor %}
+        </ul>
+    </div>
+
     <div class="links" style="margin-top: 30px;">
         <h2>Community & Discussion</h2>
         <ul>

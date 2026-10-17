@@ -25,6 +25,7 @@
     .bar-poetry { background: #7e5499; }
     .bar-social { background: #c58b27; }
     .bar-papers { background: #b8482e; }
+    .bar-news { background: #286675; }
     .chart-legend { display: flex; flex-wrap: wrap; gap: 16px; list-style: none; margin-bottom: 20px; font-size: .9em; }
     .chart-key { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; }
     .interval-scroll { overflow-x: auto; padding-top: 12px; }
@@ -66,6 +67,11 @@
     {% endif %}
     {% if since_snapshot %}
     <p><strong>{{ since_snapshot.total | comma_separated }}</strong> visits since the latest snapshot.</p>
+    {% if request_rate %}
+    <p>Average request rate since the latest snapshot: <strong>{{ request_rate }}</strong>.</p>
+    {% else %}
+    <p class="stats-note">Average request rate is unavailable until time has elapsed since the latest snapshot.</p>
+    {% endif %}
     {% endif %}
 
     <h2>Recent visits</h2>
@@ -104,7 +110,7 @@
     <div class="stats-scroll">
         <table class="stats-table">
             <caption>Latest 90 snapshots (UTC)</caption>
-            <thead><tr><th scope="col">Saved (UTC)</th><th scope="col">Since (UTC)</th><th scope="col">Blog</th><th scope="col">Haiku</th><th scope="col">Poetry</th><th scope="col">Social</th><th scope="col">Papers</th><th scope="col">Interval total</th><th scope="col">Cumulative total</th></tr></thead>
+            <thead><tr><th scope="col">Saved (UTC)</th><th scope="col">Since (UTC)</th><th scope="col">Blog</th><th scope="col">Haiku</th><th scope="col">Poetry</th><th scope="col">Social</th><th scope="col">Papers</th><th scope="col">News</th><th scope="col">Interval total</th><th scope="col">Cumulative total</th></tr></thead>
             <tbody>
                 {% for snapshot in history %}
                 <tr>
@@ -112,7 +118,7 @@
                     <td>{% if snapshot.since %}<time>{{ snapshot.since | escape }}</time>{% else %}Baseline{% endif %}</td>
                     <td>{{ snapshot.visits.blog | comma_separated }}</td><td>{{ snapshot.visits.haiku | comma_separated }}</td>
                     <td>{{ snapshot.visits.poetry | comma_separated }}</td><td>{{ snapshot.visits.social | comma_separated }}</td>
-                    <td>{{ snapshot.visits.papers | comma_separated }}</td><td>{{ snapshot.visits.total | comma_separated }}</td>
+                    <td>{{ snapshot.visits.papers | comma_separated }}</td><td>{{ snapshot.visits.news | comma_separated }}</td><td>{{ snapshot.visits.total | comma_separated }}</td>
                     <td>{{ snapshot.counts.total | comma_separated }}</td>
                 </tr>
                 {% endfor %}

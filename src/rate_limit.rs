@@ -878,6 +878,17 @@ mod tests {
         );
         assert_eq!(
             endpoint
+                .get_response(request(
+                    peer,
+                    "/news/2024-02-29/science/0",
+                    Some("192.0.2.1")
+                ))
+                .await
+                .status(),
+            StatusCode::TOO_MANY_REQUESTS
+        );
+        assert_eq!(
+            endpoint
                 .get_response(request(peer, "/missing-route", Some("192.0.2.2")))
                 .await
                 .status(),

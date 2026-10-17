@@ -1,5 +1,6 @@
 mod data;
 mod generators;
+mod news;
 mod origins;
 mod papers;
 mod poetry;
@@ -82,6 +83,10 @@ fn increment_poetry_visits() -> VisitCounts {
     VISITS.increment(Section::Poetry)
 }
 
+fn increment_news_visits() -> VisitCounts {
+    VISITS.increment(Section::News)
+}
+
 /// Helper to insert visit counts into template context
 fn insert_visit_counts(context: &mut Context, counts: &VisitCounts) {
     context.insert("blog_visits", &counts.blog);
@@ -89,6 +94,7 @@ fn insert_visit_counts(context: &mut Context, counts: &VisitCounts) {
     context.insert("poetry_visits", &counts.poetry);
     context.insert("social_visits", &counts.social);
     context.insert("paper_visits", &counts.papers);
+    context.insert("news_visits", &counts.news);
     context.insert("total_visits", &counts.total);
 }
 
@@ -604,6 +610,13 @@ fn index() -> Result<Html<String>, poem::Error> {
     context.insert("featured_posts", &featured_posts);
     context.insert("haiku_links", &haiku_links);
     context.insert("poetry_links", &poetry_links);
+    context.insert(
+        "news_links",
+        &generators::news::headlines(visits::now().date_naive(), None, 0)
+            .into_iter()
+            .take(4)
+            .collect::<Vec<_>>(),
+    );
 
     insert_visit_counts(&mut context, &visit_counts);
 
@@ -945,6 +958,7 @@ fn routes() -> Route {
         .at("/robots.txt", get(robots_txt))
         .at("/visits", get(visits::page))
         .nest("/papers", papers::routes())
+        .nest("/news", news::routes())
         // Social media routes
         .at("/social", get(social_feed))
         .at("/social/user/:username", get(social_user_profile))
@@ -1380,6 +1394,7 @@ mod tests {
         context.insert("featured_posts", &posts);
         context.insert("haiku_links", &Vec::<(String, String)>::new());
         context.insert("poetry_links", &Vec::<poetry::PoetryLink>::new());
+        context.insert("news_links", &Vec::<generators::news::Summary>::new());
         insert_visit_counts(&mut context, &get_visit_counts());
         let page = TEMPLATES.render("index_trap.html.tera", &context).unwrap();
         let featured = page

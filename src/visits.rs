@@ -27,14 +27,23 @@ pub struct VisitCounts {
     pub poetry: u64,
     pub social: u64,
     pub papers: u64,
+    #[serde(default)]
+    pub news: u64,
     pub total: u64,
 }
 
 impl VisitCounts {
     fn validate(self) -> io::Result<Self> {
-        let total = [self.blog, self.haiku, self.poetry, self.social, self.papers]
-            .into_iter()
-            .try_fold(0_u64, u64::checked_add);
+        let total = [
+            self.blog,
+            self.haiku,
+            self.poetry,
+            self.social,
+            self.papers,
+            self.news,
+        ]
+        .into_iter()
+        .try_fold(0_u64, u64::checked_add);
         if total != Some(self.total) {
             return Err(invalid("Visit total does not match section counts"));
         }
@@ -53,6 +62,7 @@ impl VisitCounts {
             poetry: subtract(self.poetry, earlier.poetry)?,
             social: subtract(self.social, earlier.social)?,
             papers: subtract(self.papers, earlier.papers)?,
+            news: subtract(self.news, earlier.news)?,
             total: subtract(self.total, earlier.total)?,
         })
     }
@@ -64,6 +74,7 @@ pub enum Section {
     Poetry,
     Social,
     Papers,
+    News,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -128,6 +139,7 @@ impl Default for Tracker {
             poetry: 552,
             social: 6_192,
             papers: 1_272_458,
+            news: 0,
             total: 3_156_461,
         };
         Self {
@@ -158,6 +170,7 @@ impl Tracker {
             Section::Poetry => &mut counts.poetry,
             Section::Social => &mut counts.social,
             Section::Papers => &mut counts.papers,
+            Section::News => &mut counts.news,
         };
         *counter = counter.checked_add(1).expect("Visit counter overflow");
         counts.total = counts
@@ -442,6 +455,7 @@ fn section_bars(counts: VisitCounts, scale: u64) -> Vec<SectionBar> {
         ("Poetry", "poetry", counts.poetry),
         ("Social", "social", counts.social),
         ("Papers", "papers", counts.papers),
+        ("News", "news", counts.news),
     ]
     .into_iter()
     .map(|(name, key, count)| SectionBar {
@@ -513,7 +527,25 @@ pub(crate) fn comma_separated(
     Ok(formatted.into())
 }
 
-fn render(tracker: &Tracker) -> poem::Result<Response> {
+fn request_rate(requests: u64, elapsed: chrono::Duration) -> Option<String> {
+    let elapsed = elapsed.to_std().ok()?;
+    if elapsed.is_zero() {
+        return None;
+    }
+    let per_second = requests as f64 / elapsed.as_secs_f64();
+    let (rate, unit) = if per_second >= 1.0 {
+        (per_second, "req/s")
+    } else if per_second * 60.0 >= 1.0 {
+        (per_second * 60.0, "req/min")
+    } else if per_second * 3_600.0 >= 1.0 {
+        (per_second * 3_600.0, "req/h")
+    } else {
+        (per_second * 86_400.0, "req/day")
+    };
+    Some(format!("{rate:.2} {unit}"))
+}
+
+fn render(tracker: &Tracker, timestamp: DateTime<Utc>) -> poem::Result<Response> {
     let memory = tracker.memory.lock().expect("Visit counters lock poisoned");
     let mut context = Context::new();
     crate::insert_visit_counts(&mut context, &memory.counts);
@@ -524,6 +556,7 @@ fn render(tracker: &Tracker) -> poem::Result<Response> {
         memory.counts.poetry,
         memory.counts.social,
         memory.counts.papers,
+        memory.counts.news,
     ]
     .into_iter()
     .max()
@@ -533,13 +566,17 @@ fn render(tracker: &Tracker) -> poem::Result<Response> {
     context.insert("history", &memory.history.iter().rev().collect::<Vec<_>>());
     context.insert("checkpoint_at", &memory.checkpoint_at);
     context.insert("persistence_error", &memory.persistence_error);
-    let delta = memory
-        .history
-        .back()
-        .map(|snapshot| memory.counts.difference(snapshot.counts))
-        .transpose()
-        .map_err(InternalServerError)?;
-    context.insert("since_snapshot", &delta);
+    if let Some(snapshot) = memory.history.back() {
+        let delta = memory
+            .counts
+            .difference(snapshot.counts)
+            .map_err(InternalServerError)?;
+        context.insert("since_snapshot", &delta);
+        context.insert(
+            "request_rate",
+            &request_rate(delta.total, timestamp - snapshot.recorded_at),
+        );
+    }
     drop(memory);
     let html = crate::TEMPLATES
         .render("visits.html.tera", &context)
@@ -552,7 +589,7 @@ fn render(tracker: &Tracker) -> poem::Result<Response> {
 
 #[handler]
 pub fn page() -> poem::Result<Response> {
-    render(&VISITS)
+    render(&VISITS, now())
 }
 
 #[cfg(test)]
@@ -601,7 +638,7 @@ mod tests {
     fn each_section_updates_a_consistent_snapshot_under_concurrency() {
         let tracker = Arc::new(Tracker::default());
         let original = tracker.counts();
-        let threads = (0..5)
+        let threads = (0..6)
             .map(|index| {
                 let tracker = tracker.clone();
                 std::thread::spawn(move || {
@@ -611,7 +648,8 @@ mod tests {
                             1 => Section::Haiku,
                             2 => Section::Poetry,
                             3 => Section::Social,
-                            _ => Section::Papers,
+                            4 => Section::Papers,
+                            _ => Section::News,
                         };
                         tracker.increment(section).validate().unwrap();
                     }
@@ -629,9 +667,76 @@ mod tests {
                 poetry: 1_000,
                 social: 1_000,
                 papers: 1_000,
-                total: 5_000,
+                news: 1_000,
+                total: 6_000,
             }
         );
+    }
+
+    #[test]
+    fn pre_news_history_and_checkpoint_restore_without_losing_counts() {
+        let directory = TempDir::new().unwrap();
+        let tracker = Tracker::default();
+        let mut store = Store::open(directory.path(), &tracker, start()).unwrap();
+        tracker.increment(Section::Blog);
+        let next_day = start() + chrono::Duration::days(1);
+        store.save(&tracker, next_day, true).unwrap();
+        tracker.increment(Section::Papers);
+        store
+            .save(&tracker, next_day + CHECKPOINT_INTERVAL, true)
+            .unwrap();
+        drop(store);
+        let original = tracker.counts();
+
+        let mut old_checkpoint = serde_json::to_value(checkpoint(directory.path())).unwrap();
+        old_checkpoint["counts"]
+            .as_object_mut()
+            .unwrap()
+            .remove("news");
+        fs::write(
+            directory.path().join("visits.json"),
+            serde_json::to_vec(&old_checkpoint).unwrap(),
+        )
+        .unwrap();
+        let old_history = snapshots(directory.path())
+            .into_iter()
+            .map(|snapshot| {
+                let mut row = serde_json::to_value(snapshot).unwrap();
+                for field in ["counts", "visits"] {
+                    row[field].as_object_mut().unwrap().remove("news");
+                }
+                serde_json::to_string(&row).unwrap() + "\n"
+            })
+            .collect::<String>();
+        fs::write(directory.path().join("visits.jsonl"), old_history).unwrap();
+
+        let restored = Tracker::default();
+        let mut store = Store::open(
+            directory.path(),
+            &restored,
+            next_day + chrono::Duration::minutes(6),
+        )
+        .unwrap();
+        assert_eq!(restored.counts(), original);
+        assert_eq!(restored.counts().news, 0);
+        restored.increment(Section::News);
+        restored.increment(Section::News);
+        let later = next_day + chrono::Duration::days(1);
+        store.save(&restored, later, true).unwrap();
+        let rows = snapshots(directory.path());
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].counts.news, 0);
+        assert_eq!(rows[1].visits.blog, 1);
+        assert_eq!(rows[2].visits.news, 2);
+        assert_eq!(rows[2].visits.papers, 1);
+        assert_eq!(rows[2].visits.total, 3);
+        assert_eq!(checkpoint(directory.path()).counts, restored.counts());
+        drop(store);
+
+        let restarted = Tracker::default();
+        let _store = Store::open(directory.path(), &restarted, later).unwrap();
+        assert_eq!(restarted.counts(), restored.counts());
+        assert_eq!(restarted.counts().total, original.total + 2);
     }
 
     #[test]
@@ -925,7 +1030,7 @@ mod tests {
         tracker.increment(Section::Blog);
         tracker.memory.lock().unwrap().persistence_error = true;
         let before = tracker.counts();
-        let response = render(&tracker).unwrap();
+        let response = render(&tracker, start() + chrono::Duration::hours(26)).unwrap();
         assert_eq!(response.headers()["Cache-Control"], "no-store");
         let html = response.into_body().into_string().await.unwrap();
         assert!(html.contains("Visit History"));
@@ -950,6 +1055,7 @@ mod tests {
         let formatted = comma_separated(&before.total.into(), &HashMap::new()).unwrap();
         assert!(html.contains(formatted.as_str().unwrap()));
         assert!(html.contains("<strong>1</strong> visits since"));
+        assert!(html.contains("<strong>12.00 req/day</strong>"));
         assert_eq!(tracker.counts(), before);
         let response = crate::routes()
             .get_response(Request::builder().uri_str("/visits").finish())
@@ -967,20 +1073,122 @@ mod tests {
     }
 
     #[test]
+    fn request_rates_switch_units_at_one_before_rounding() {
+        for (requests, elapsed, expected) in [
+            (0, chrono::Duration::hours(1), "0.00 req/day"),
+            (1, chrono::Duration::days(2), "0.50 req/day"),
+            (23, chrono::Duration::days(1), "23.00 req/day"),
+            (24, chrono::Duration::days(1), "1.00 req/h"),
+            (25, chrono::Duration::days(1), "1.04 req/h"),
+            (59, chrono::Duration::hours(1), "59.00 req/h"),
+            (60, chrono::Duration::hours(1), "1.00 req/min"),
+            (61, chrono::Duration::hours(1), "1.02 req/min"),
+            (59, chrono::Duration::minutes(1), "59.00 req/min"),
+            (60, chrono::Duration::minutes(1), "1.00 req/s"),
+            (61, chrono::Duration::minutes(1), "1.02 req/s"),
+            (1, chrono::Duration::milliseconds(500), "2.00 req/s"),
+            (1, chrono::Duration::milliseconds(1_001), "59.94 req/min"),
+            (1, chrono::Duration::milliseconds(60_001), "60.00 req/h"),
+            (
+                1,
+                chrono::Duration::milliseconds(3_600_001),
+                "24.00 req/day",
+            ),
+        ] {
+            assert_eq!(
+                request_rate(requests, elapsed).as_deref(),
+                Some(expected),
+                "{requests} requests over {elapsed}",
+            );
+        }
+        for elapsed in [chrono::Duration::zero(), chrono::Duration::seconds(-1)] {
+            assert_eq!(request_rate(1, elapsed), None);
+        }
+    }
+
+    #[tokio::test]
+    async fn request_rate_uses_latest_snapshot_not_checkpoint_or_restart() {
+        let directory = TempDir::new().unwrap();
+        let tracker = Tracker::default();
+        let mut store = Store::open(directory.path(), &tracker, start()).unwrap();
+        tracker.increment(Section::Poetry);
+        let latest = start() + chrono::Duration::days(1);
+        store.save(&tracker, latest, false).unwrap();
+        tracker.increment(Section::News);
+        tracker.increment(Section::Papers);
+        let checkpoint_at = latest + chrono::Duration::minutes(5);
+        store.save(&tracker, checkpoint_at, false).unwrap();
+        drop(store);
+
+        let restored = Tracker::default();
+        let _store = Store::open(
+            directory.path(),
+            &restored,
+            latest + chrono::Duration::minutes(6),
+        )
+        .unwrap();
+        let html = render(&restored, latest + chrono::Duration::hours(1))
+            .unwrap()
+            .into_body()
+            .into_string()
+            .await
+            .unwrap();
+        assert!(html.contains("<strong>2</strong> visits since"));
+        assert!(html.contains("<strong>2.00 req/h</strong>"));
+        assert_eq!(restored.counts(), tracker.counts());
+    }
+
+    #[tokio::test]
+    async fn request_rate_handles_missing_history_zero_visits_and_nonpositive_elapsed_time() {
+        let directory = TempDir::new().unwrap();
+        let tracker = Tracker::default();
+        let html = render(&tracker, start())
+            .unwrap()
+            .into_body()
+            .into_string()
+            .await
+            .unwrap();
+        assert!(!html.contains("Average request rate"));
+        let _store = Store::open(directory.path(), &tracker, start()).unwrap();
+        for (timestamp, expected) in [
+            (start(), "Average request rate is unavailable"),
+            (
+                start() - chrono::Duration::seconds(1),
+                "Average request rate is unavailable",
+            ),
+            (
+                start() + chrono::Duration::hours(1),
+                "<strong>0.00 req/day</strong>",
+            ),
+        ] {
+            let html = render(&tracker, timestamp)
+                .unwrap()
+                .into_body()
+                .into_string()
+                .await
+                .unwrap();
+            assert!(html.contains(expected));
+        }
+    }
+
+    #[test]
     fn charts_scale_section_totals_and_handle_empty_or_zero_data() {
         let bars = section_bars(
             VisitCounts {
                 blog: 100,
                 haiku: 50,
-                total: 150,
+                news: 50,
+                total: 200,
                 ..VisitCounts::default()
             },
             100,
         );
-        assert_eq!(bars.len(), 5);
+        assert_eq!(bars.len(), 6);
         assert_eq!(bars[0].percent, 100.0);
         assert_eq!(bars[1].percent, 50.0);
         assert_eq!(bars[2].percent, 0.0);
+        assert_eq!(bars[5].name, "News");
+        assert_eq!(bars[5].percent, 50.0);
         assert!(interval_bars(&VecDeque::new()).is_empty());
         for bar in section_bars(VisitCounts::default(), 0) {
             assert_eq!(bar.percent, 0.0);

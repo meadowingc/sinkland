@@ -4,7 +4,7 @@ Inspired by https://herman.bearblog.dev/messing-with-bots/
 
 A playground of different traps for AI bots and scrapers. It makes an endless
 maze of blog posts, haikus and rhymed poems, fictional social profiles, fake
-academic papers, and images. Pages are generated on demand; there's no database.
+academic papers, daily news, and images. Pages are generated on demand; there's no database.
 The papers are synthetic, not real research.
 
 Links mostly stay inside Sinkland. You can also set `SINKLAND_FRIENDS` to a JSON
@@ -64,6 +64,39 @@ SINKLAND_ORIGINS='["https://sink.meadow.cafe","https://archive.meadow.cafe","htt
 ```
 
 Set it in `.env`.
+
+## Daily news
+
+`/news` opens **Sinkland Daily**, with dated editions from `2000-01-01` through
+today (UTC). Eight desks cover city life, science, technology, business, culture,
+environment, sport, and transport. Each date has 24 stories per desk, browsable
+in pages of 12. Previous/next-day links preserve the selected desk.
+
+Articles use 40 topic-specific reporting scenarios, six developments and six
+formats: reports, explainers, on-the-ground dispatches, interviews, data
+briefings, and timelines. Locations, people, decisions and activity records are
+generated locally from the date, topic and story number. A story's title,
+preview, text and figures agree across listings and repeat visits. Bar and line
+graphics include accessible data tables; their numbers come from the same
+records as the article. There are no external news feeds, API calls, JavaScript
+requirements, or additional runtime assets.
+
+For example, `/news/2024-02-29/science/0` is a stable article;
+`/news/2024-02-29/science?page=1` is its desk's second page. Future or invalid
+dates, unknown desks, and out-of-range stories/pages are rejected. The section
+uses the existing traffic protection, crawler directives, and configured
+origin-link routing.
+
+Reporter bylines link to `/news/reporter/<name>`, showing that reporter's actual
+articles across all desks and dates, newest first. Cursor pagination continues
+through the archive without changing author assignments or inventing additional
+posts. Each request examines at most 32 days' worth of story slots; a continuation
+link preserves access to older results even when a page is not full.
+
+News page views contribute to the footer, visit history, charts and request
+rate. Older saved statistics load with zero news visits without resetting any
+existing counters. Keep a state backup before downgrading to a pre-news binary,
+which cannot read the added counter.
 
 ## Traffic protection
 
@@ -129,6 +162,12 @@ including repeat visits and crawlers, not unique visitors. Counting behavior
 for existing sections is unchanged; some failed page requests may count, but
 rate-limited requests and images/static files do not. No visitor IPs or personal
 details are stored.
+
+The page also shows the average request rate since the latest daily snapshot,
+using the visits accumulated over the elapsed time. It displays `req/day`,
+switching to `req/h`, `req/min`, or `req/s` when the rate reaches at least one
+request in that unit (before rounding to two decimal places). Checkpoints and
+restarts do not reset this interval.
 
 The app saves a row to `visits.jsonl` on the first run, then shortly after each
 UTC date change (checked once a minute). The initial row preserves the previous

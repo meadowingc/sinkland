@@ -29,10 +29,12 @@
         }
         
         .navbar-container {
-            max-width: 800px;
+            max-width: 1100px;
             margin: 0 auto;
             padding: 0 20px;
             display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
             justify-content: space-between;
             align-items: center;
         }
@@ -185,6 +187,7 @@
                 <li><a href="/poetry" rel="nofollow noopener noreferrer">Poetry</a></li>
                 <li><a href="/social" rel="nofollow noopener noreferrer">Social</a></li>
                 <li><a href="/papers" rel="nofollow noopener noreferrer">Papers</a></li>
+                <li><a href="/news" rel="nofollow noopener noreferrer">News</a></li>
             </ul>
         </div>
     </nav>
@@ -201,7 +204,8 @@
                 <span class="visit-stat">🍃 Haiku: <strong>{{ haiku_visits | default(value=0) | comma_separated }}</strong></span> ·
                 <span class="visit-stat">✒ Poetry: <strong>{{ poetry_visits | default(value=0) | comma_separated }}</strong></span> ·
                 <span class="visit-stat">💬 Social: <strong>{{ social_visits | default(value=0) | comma_separated }}</strong></span> ·
-                <span class="visit-stat">📄 Papers: <strong>{{ paper_visits | default(value=0) | comma_separated }}</strong></span><br/>
+                <span class="visit-stat">📄 Papers: <strong>{{ paper_visits | default(value=0) | comma_separated }}</strong></span> ·
+                <span class="visit-stat">📰 News: <strong>{{ news_visits | default(value=0) | comma_separated }}</strong></span><br/>
                 <span class="visit-stat">🌐 Total: <strong>{{ total_visits | default(value=0) | comma_separated }}</strong></span>
                 <br/><a href="/visits" rel="nofollow noopener noreferrer" style="color: #ecf0f1;">Visit history</a>
             </p>

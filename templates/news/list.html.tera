@@ -1,0 +1,31 @@
+{% extends "news/base.html.tera" %}
+
+{% block title %}{% if reporter_name %}Articles by {{ reporter_name | escape }}{% else %}{% if topic_label %}{{ topic_label | escape }} - {% endif %}{{ date }}{% endif %} - Sinkland Daily{% endblock title %}
+
+{% block news_content %}
+<h1>{% if reporter_name %}Articles by {{ reporter_name | escape }}{% elif topic_label %}{{ topic_label | escape }}{% else %}The daily briefing{% endif %}</h1>
+{% if reporter_name %}
+<p>Reporting across all desks, newest first.</p>
+{% if not headlines %}<p>No articles in this part of the archive.{% if older_url %} Continue to earlier dates below.{% endif %}</p>{% endif %}
+{% endif %}
+<div class="news-grid">
+    {% for story in headlines %}
+    <article class="news-card">
+        <span class="news-kicker">{{ story.topic | escape }} &middot; {{ story.format | escape }}</span>
+        <h2><a href="{{ story.url | escape }}" rel="nofollow noopener noreferrer" data-sinkland-link>{{ story.title | escape }}</a></h2>
+        <p class="news-meta"><time datetime="{{ story.date }}">{{ story.date }}</time> &middot; {{ story.location | escape }} &middot; By <a href="{{ story.reporter_url | escape }}" rel="author nofollow noopener noreferrer" data-sinkland-link>{{ story.byline | escape }}</a></p>
+        <p class="news-preview">{{ story.preview | escape }}</p>
+    </article>
+    {% endfor %}
+</div>
+<nav class="news-pagination" aria-label="News pages">
+    {% if reporter_name %}
+    <a href="{{ reporter_url | escape }}" rel="nofollow">Most recent articles</a>
+    {% if older_url %}<a href="{{ older_url | escape }}" rel="nofollow">Earlier articles</a>{% endif %}
+    {% else %}
+    {% if has_previous_page %}<a href="{{ edition_url | escape }}?page={{ previous_page }}" rel="nofollow">Previous page</a>{% endif %}
+    <span>Page {{ page_number }} of {{ page_count }}</span>
+    {% if has_next_page %}<a href="{{ edition_url | escape }}?page={{ next_page }}" rel="nofollow">More headlines</a>{% endif %}
+    {% endif %}
+</nav>
+{% endblock news_content %}
