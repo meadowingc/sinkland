@@ -5,6 +5,8 @@ use rand::{Rng, SeedableRng, seq::SliceRandom};
 use rand_chacha::ChaCha8Rng;
 use serde::Serialize;
 
+mod narrative;
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Section {
     pub heading: Option<String>,
@@ -1503,6 +1505,25 @@ fn format_ending<R: Rng>(format: usize, theme: Theme, rng: &mut R) -> String {
 }
 
 pub fn generate(identity: &str) -> Post {
+    if prose_mode(identity) == ProseMode::Post
+        || stream(identity, "narrative-choice-v2").gen_ratio(1, 8)
+    {
+        return reflective_post(identity);
+    }
+    let (format, theme, title, _) = post_identity(identity);
+    let mut post = narrative::generate(identity, format, theme, title);
+    if prose_mode(identity) == ProseMode::Paragraph {
+        let mut rng = stream(identity, "book-prose");
+        let words = prose_words(theme, &mut rng);
+        post.sections[1]
+            .paragraphs
+            .insert(0, book_prose_paragraph(theme, &words, 2, &mut rng));
+    }
+    post.reading_minutes = post.word_count().div_ceil(200);
+    post
+}
+
+fn reflective_post(identity: &str) -> Post {
     let (format, theme, title, texture) = post_identity(identity);
     if prose_mode(identity) == ProseMode::Post {
         return book_prose_post(identity, format, theme, title);

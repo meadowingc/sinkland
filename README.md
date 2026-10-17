@@ -65,6 +65,27 @@ SINKLAND_ORIGINS='["https://sink.meadow.cafe","https://archive.meadow.cafe","htt
 
 Set it in `.env`.
 
+## Blogs and poetry
+
+Blogs retain their four genres and 72 premises, while mixing reflective entries
+with 16 branching episodes: disputed readings, disrupted walks, experiments
+with routines, repairs, observation mistakes and other concrete developments.
+Each episode has two paired decisions and consequences. Sixteen critical
+perspectives and six layouts vary the emphasis without scrambling the sequence
+of events. Titles and topic assignments keep their existing identity seeds;
+listing excerpts and reading times come from the resulting article.
+
+Rhymed poetry combines 45 sentence frames with scene, memory/question and
+departure phases. Up to two recurring images from a shared vocabulary group
+connect the lines, while grammatical constructions, modifiers, temporal phrases and
+titles vary. The eight forms retain their exact syllable counts, spoken rhyme
+families and required refrains; impossible constraints remain errors rather
+than approximate lines. Haiku generation is unchanged.
+
+This is poetry identity version 3: existing canonical URLs remain valid, but
+their poem text and titles intentionally change with the new generator.
+Collection cards still use the exact title and first line of their destination.
+
 ## Research papers
 
 Paper bodies combine six layout strategies with eighteen analytical

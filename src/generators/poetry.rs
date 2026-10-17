@@ -1,12 +1,14 @@
-//! Deterministic, pronunciation-constrained poems. Identity version 2 fixes the
-//! lexicon, recipes, and PRNG; changing any of them changes rendered identities.
+//! Deterministic, pronunciation-constrained poems. Identity version 3 fixes the
+//! lexicon, syntax, recipes, and PRNG; changing them changes rendered identities.
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::sync::OnceLock;
 
+mod syntax;
+
 const SOURCE: &str = include_str!("../../corpus/poetry/lexicon.tsv");
-pub const IDENTITY_VERSION: u64 = 2;
+pub const IDENTITY_VERSION: u64 = 3;
 const MAX_PREFIXES: usize = 300_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -73,6 +75,8 @@ pub struct LineMetadata {
     /// ARPABET from the last primary-stressed vowel through the final phoneme.
     pub rhyme_family: &'static str,
     pub ending: &'static str,
+    #[cfg(test)]
+    frame: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -126,83 +130,12 @@ struct Word {
 }
 
 #[derive(Clone, Copy)]
-struct Phrase {
-    text: &'static str,
-    syllables: u8,
-}
-
-const OPENERS: [Phrase; 7] = [
-    Phrase {
-        text: "The",
-        syllables: 1,
-    },
-    Phrase {
-        text: "A",
-        syllables: 1,
-    },
-    Phrase {
-        text: "Now the",
-        syllables: 2,
-    },
-    Phrase {
-        text: "At dawn the",
-        syllables: 3,
-    },
-    Phrase {
-        text: "Tonight the",
-        syllables: 3,
-    },
-    Phrase {
-        text: "At dusk the",
-        syllables: 3,
-    },
-    Phrase {
-        text: "At noon the",
-        syllables: 3,
-    },
-];
-const OBJECTS: [Phrase; 8] = [
-    Phrase {
-        text: "the",
-        syllables: 1,
-    },
-    Phrase {
-        text: "a",
-        syllables: 1,
-    },
-    Phrase {
-        text: "my",
-        syllables: 1,
-    },
-    Phrase {
-        text: "that",
-        syllables: 1,
-    },
-    Phrase {
-        text: "the old",
-        syllables: 2,
-    },
-    Phrase {
-        text: "the pale",
-        syllables: 2,
-    },
-    Phrase {
-        text: "the little",
-        syllables: 3,
-    },
-    Phrase {
-        text: "a quiet",
-        syllables: 3,
-    },
-];
-
-#[derive(Clone, Copy)]
 struct Prefix {
-    opener: usize,
+    frame: usize,
+    lead: usize,
     modifier: Option<usize>,
     subject: usize,
     verb: usize,
-    object: usize,
 }
 
 struct Lexicon {
@@ -224,6 +157,7 @@ fn lexicon() -> Result<&'static Lexicon, PoetryError> {
 
 pub fn validate_lexicon() -> Result<(), PoetryError> {
     let lexicon = lexicon()?;
+    syntax::validate_subjects(lexicon)?;
     for form in Form::all() {
         for variant in 0..3 {
             validate_recipe(&recipe(*form, &mut StableRng::new(variant, 0)), lexicon)?;
@@ -320,38 +254,7 @@ fn parse_lexicon(source: &'static str) -> Result<Lexicon, PoetryError> {
             "insufficient grammatical words or independent rhyme families (minimum seven families of four)".into(),
         ));
     }
-    let mut prefixes: [Vec<Prefix>; 11] = std::array::from_fn(|_| Vec::new());
-    let mut count = 0;
-    for (opener, start) in OPENERS.iter().enumerate() {
-        for modifier in std::iter::once(None).chain((0..modifiers.len()).map(Some)) {
-            for (subject, noun) in subjects.iter().enumerate() {
-                for (verb, action) in verbs.iter().enumerate() {
-                    for (object, article) in OBJECTS.iter().enumerate() {
-                        let syllables = start.syllables as usize
-                            + modifier.map_or(0, |i| modifiers[i].syllables as usize)
-                            + noun.syllables as usize
-                            + action.syllables as usize
-                            + article.syllables as usize;
-                        if syllables <= 10 {
-                            count += 1;
-                            if count > MAX_PREFIXES {
-                                return Err(PoetryError::InvalidLexicon(
-                                    "prefix bank exceeds the bounded capacity".into(),
-                                ));
-                            }
-                            prefixes[syllables].push(Prefix {
-                                opener,
-                                modifier,
-                                subject,
-                                verb,
-                                object,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let prefixes = syntax::prefixes(&subjects, &verbs, &modifiers)?;
     Ok(Lexicon {
         subjects,
         verbs,
@@ -621,6 +524,11 @@ fn render(form: Form, id: u64, first_only: bool) -> Result<Poem, PoetryError> {
     let mut structure_rng = StableRng::new(id, 0x706f657472792d31 ^ (form as u64));
     let recipe = recipe(form, &mut structure_rng);
     validate_recipe(&recipe, lexicon)?;
+    let total_lines = recipe.iter().map(Vec::len).sum::<usize>();
+    let mut language_rng = StableRng::new(id, 0x706f657472792d33 ^ (form as u64));
+    let subjects = syntax::subjects(lexicon, &mut language_rng)?;
+    let phases = [[1, 2, 4], [2, 1, 4], [1, 4, 2]][language_rng.pick(3)];
+    let mut used_frames = HashSet::new();
     let mut rng = StableRng::new(id, 0x706f657472792d32 ^ (form as u64));
     let mut families: Vec<_> = lexicon.families.keys().copied().collect();
     rng.shuffle(&mut families);
@@ -663,28 +571,26 @@ fn render(form: Form, id: u64, first_only: bool) -> Result<Poem, PoetryError> {
                         spec.syllables
                     )));
                 }
-                let prefix = candidates[rng.pick(candidates.len())];
+                let phase = phases[prior_lines.len() * 3 / total_lines];
+                let prefix = syntax::choose(
+                    candidates,
+                    &subjects,
+                    phase,
+                    &mut used_frames,
+                    &mut language_rng,
+                )?;
                 if first_subject.is_none() {
                     first_subject = Some(lexicon.subjects[prefix.subject].text);
                 }
-                let modifier = prefix
-                    .modifier
-                    .map_or(String::new(), |i| format!("{} ", lexicon.modifiers[i].text));
-                let line = format!(
-                    "{} {}{} {} {} {}",
-                    OPENERS[prefix.opener].text,
-                    modifier,
-                    lexicon.subjects[prefix.subject].text,
-                    lexicon.verbs[prefix.verb].text,
-                    OBJECTS[prefix.object].text,
-                    end.text
-                );
+                let line = syntax::render(prefix, lexicon, end.text);
                 (
                     line,
                     LineMetadata {
                         syllables: spec.syllables,
                         rhyme_family: end.rhyme.expect("validated end word"),
                         ending: end.text,
+                        #[cfg(test)]
+                        frame: prefix.frame,
                     },
                 )
             };
@@ -703,7 +609,14 @@ fn render(form: Form, id: u64, first_only: bool) -> Result<Poem, PoetryError> {
     }
     let subject = first_subject.ok_or_else(|| PoetryError::InvalidRecipe("empty poem".into()))?;
     let ending = line_metadata[0][0].ending;
-    let title = format!("{} and the {ending}", capitalize(subject));
+    let mut title_rng = StableRng::new(id, 0x706f657472792d34 ^ (form as u64));
+    let title = match title_rng.pick(5) {
+        0 => format!("{} and the {ending}", capitalize(subject)),
+        1 => format!("The {subject} before the {ending}"),
+        2 => format!("{} for the {subject}", capitalize(ending)),
+        3 => format!("Where the {subject} meets the {ending}"),
+        _ => format!("Between the {subject} and the {ending}"),
+    };
     let preview = stanzas[0][0].clone();
     Ok(Poem {
         title,
@@ -748,17 +661,26 @@ mod tests {
             .map(|(rhyme, _)| *rhyme)
     }
 
-    fn measured_syllables(word: &str) -> u8 {
+    pub(super) fn measured_syllables(word: &str) -> u8 {
         match word {
             "lantern" | "river" | "window" | "sparrow" | "garden" | "shadow" | "heron"
             | "compass" | "tunnel" | "neighbor" | "crosses" | "follows" | "gathers" | "carries"
             | "borrows" | "unfolds" | "forgets" | "quiet" | "silver" | "lonely" | "faded"
-            | "gentle" | "paper" | "little" | "tonight" => 2,
+            | "gentle" | "paper" | "little" | "tonight" | "beneath" | "beside" | "between"
+            | "against" | "before" | "explain" | "among" | "within" | "without" | "beyond"
+            | "today" | "ago" | "even" => 2,
             "butterfly" | "cicada" | "remembers" | "discovers" | "imagines" => 3,
             "clock" | "map" | "book" | "bus" | "moth" | "wind" | "bridge" | "leaf" | "holds"
             | "finds" | "keeps" | "seeks" | "hides" | "hears" | "marks" | "small" | "blue"
             | "old" | "late" | "warm" | "the" | "a" | "now" | "at" | "dawn" | "dusk" | "my"
-            | "that" | "pale" => 1,
+            | "that" | "pale" | "past" | "lies" | "by" | "i" | "hear" | "waits" | "stands"
+            | "from" | "comes" | "and" | "watch" | "leans" | "toward" | "what" | "does"
+            | "know" | "of" | "was" | "or" | "knew" | "once" | "could" | "name" | "your" | "is"
+            | "not" | "no" | "can" | "asks" | "me" | "for" | "lost" | "but" | "kept" | "count"
+            | "leave" | "let" | "keep" | "give" | "back" | "to" | "while" | "stays" | "take"
+            | "we" | "share" | "still" | "turn" | "cross" | "in" | "here" | "years" | "last"
+            | "time" | "then" | "knows" | "needs" | "this" | "guards" | "each" | "has" | "its"
+            | "owns" | "spares" => 1,
             _ if expected_rhyme(word).is_some() => 1,
             _ => panic!("word lacks an independent syllable expectation: {word}"),
         }
@@ -819,7 +741,7 @@ mod tests {
                 assert_eq!(info.syllables, spec.syllables);
                 let actual: u8 = line
                     .split_whitespace()
-                    .map(|token| measured_syllables(&token.to_ascii_lowercase()))
+                    .map(|token| measured_syllables(&token.trim_matches(',').to_ascii_lowercase()))
                     .sum();
                 assert_eq!(actual, spec.syllables, "{form:?} {id}: {line}");
                 assert_eq!(line.split_whitespace().last(), Some(info.ending));
@@ -841,7 +763,11 @@ mod tests {
                 flat.push(line.as_str());
             }
         }
-        assert!(poem.title.contains(poem.line_metadata[0][0].ending));
+        assert!(
+            poem.title
+                .to_ascii_lowercase()
+                .contains(poem.line_metadata[0][0].ending)
+        );
         assert!(
             poem.stanzas
                 .iter()
